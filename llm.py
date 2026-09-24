@@ -78,9 +78,9 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
                 + knowledge_context
             )
         try:
-            max_tokens = int(os.getenv('LLM_MAX_TOKENS', '128'))
+            max_tokens = int(os.getenv('LLM_MAX_TOKENS', '256'))
         except ValueError:
-            max_tokens = 128
+            max_tokens = 256
         completion = client.chat.completions.create(
             model=model,
             messages=[{'role': 'system', 'content': system_prompt},
