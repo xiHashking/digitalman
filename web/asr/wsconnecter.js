@@ -61,6 +61,10 @@ function WebSocketConnectMethod( config ) { //定义socket连接方法类
 			
 		}
 	};
+
+	this.wsIsOpen = function () {
+		return speechSokt !== undefined && speechSokt.readyState === 1;
+	};
 	
 	// SOCEKT连接中的消息与状态响应
 	function onOpen( e ) {

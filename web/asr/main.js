@@ -49,6 +49,16 @@ var file_sample_rate=16000; //for wav file sample rate
 var file_data_array;  // array to save file data
  
 var totalsend=0;
+var speechDetected = false;
+var silenceSince = 0;
+var recordingStartedAt = 0;
+var autoStopTimer = null;
+
+// Submit a turn after a short pause once the user has actually spoken.  The
+// FunASR protocol only produces the final transcript after is_speaking=false.
+var SPEECH_LEVEL_THRESHOLD = 8;
+var AUTO_STOP_SILENCE_MS = 900;
+var MIN_RECORDING_MS = 600;
 
 // The current homepage stores the WebRTC session in JavaScript and passes it
 // through the voice-chat link. Keep compatibility with the legacy hidden input.
@@ -409,7 +419,15 @@ async function waitSpeakingEnd() {
 		await sleep(1000)
 	}
 	await sleep(2000)
-	rec.start() 
+	// Resume capture for the next turn. stop() sets isRec=false, so restore it
+	// before starting the recorder or subsequent audio would be ignored.
+	if (wsconnecter.wsIsOpen()) {
+		isRec = true;
+		speechDetected = false;
+		silenceSince = 0;
+		recordingStartedAt = Date.now();
+		rec.start()
+	}
 }
 // 语音识别结果; 对jsonMsg数据解析,将识别结果附加到编辑框中
 function getJsonMessage( jsonMsg ) {
@@ -501,8 +519,11 @@ function getConnState( connState ) {
 
 function record()
 {
- 
+
 		 rec.open( function(){
+			speechDetected = false;
+			silenceSince = 0;
+			recordingStartedAt = Date.now();
 		 rec.start();
 		 console.log("开始");
 			btnStart.disabled = true;
@@ -547,6 +568,11 @@ function start() {
 
  
 function stop() {
+		if (isRec !== true) return;
+		if (autoStopTimer) {
+			clearTimeout(autoStopTimer);
+			autoStopTimer = null;
+		}
 		var chunk_size = new Array( 5, 10, 5 );
 		var request = {
 			"chunk_size": chunk_size,
@@ -571,21 +597,17 @@ function stop() {
 	// 控件状态更新
 	
 	isRec = false;
+	speechDetected = false;
+	silenceSince = 0;
     info_div.innerHTML="发送完数据,请等候,正在识别...";
 
    if(isfilemode==false){
 	    btnStop.disabled = true;
 		btnStart.disabled = true;
 		btnConnect.disabled=true;
-		//wait 3s for asr result
-	  setTimeout(function(){
-		console.log("call stop ws!");
-		wsconnecter.wsStop();
-		btnConnect.disabled=false;
-		info_div.innerHTML="请点击连接";}, 3000 );
- 
- 
-	   
+		// Keep the ASR socket open until the final result arrives. Closing it
+		// after a fixed 3 seconds can race the first local SenseVoice load.
+		// waitSpeakingEnd() resumes the recorder for the next turn.
 	rec.stop(function(blob,duration){
   
 		console.log(blob);
@@ -628,7 +650,19 @@ function clear() {
  
 function recProcess( buffer, powerLevel, bufferDuration, bufferSampleRate,newBufferIdx,asyncEnd ) {
 	if ( isRec === true ) {
-		var data_48k = buffer[buffer.length-1];  
+		if (powerLevel >= SPEECH_LEVEL_THRESHOLD) {
+			speechDetected = true;
+			silenceSince = 0;
+		} else if (speechDetected && bufferDuration >= MIN_RECORDING_MS) {
+			if (!silenceSince) silenceSince = Date.now();
+			if (Date.now() - silenceSince >= AUTO_STOP_SILENCE_MS) {
+				info_div.innerHTML="检测到停顿，正在识别...";
+				stop();
+				return;
+			}
+		}
+
+		var data_48k = buffer[buffer.length-1];
  
 		var  array_48k = new Array(data_48k);
 		var data_16k=Recorder.SampleData(array_48k,bufferSampleRate,16000).data;
