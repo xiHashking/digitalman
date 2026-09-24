@@ -120,7 +120,7 @@
             </a>
         </div>
         <div class="col-md-3">
-            <a href="/asr/index.html" class="quick-link" target="_blank" onclick="return openVoiceChat(event)">
+            <a href="#voice-chat" class="quick-link" onclick="return openVoiceChat(event)">
                 <div class="glass-card p-3 text-center">
                     <i class="bi bi-mic-fill fs-2" style="color: #4361ee;"></i>
                     <div class="fw-bold mt-2">语音对话</div>
@@ -189,7 +189,20 @@
                 </div>
             </div>
 
-            <!-- 3. Audio Upload -->
+            <!-- 3. Inline Voice Chat -->
+            <div class="glass-card" id="voiceChatCard" style="display:none;">
+                <div class="card-header"><i class="bi bi-mic-fill"></i> 语音对话</div>
+                <div class="card-body p-2">
+                    <iframe
+                        id="voiceChatFrame"
+                        title="语音对话"
+                        allow="microphone"
+                        style="display:block;width:100%;height:560px;border:0;border-radius:8px;background:#fff;"
+                    ></iframe>
+                </div>
+            </div>
+
+            <!-- 4. Audio Upload -->
             <div class="glass-card">
                 <div class="card-header"><i class="bi bi-mic-fill"></i> 音频驱动 (POST /humanaudio)</div>
                 <div class="card-body">
@@ -198,7 +211,7 @@
                 </div>
             </div>
 
-            <!-- 4. Recording -->
+            <!-- 5. Recording -->
             <div class="glass-card">
                 <div class="card-header"><i class="bi bi-record-circle"></i> 录制控制 (POST /record)</div>
                 <div class="card-body">
@@ -209,7 +222,7 @@
                 </div>
             </div>
 
-            <!-- 5. Custom State -->
+            <!-- 6. Custom State -->
             <div class="glass-card">
                 <div class="card-header"><i class="bi bi-sliders"></i> 动作编排 (POST /set_audiotype)</div>
                 <div class="card-body">
@@ -247,6 +260,17 @@ function updateStatus(connected) {
 function setSessionId(sid) {
     sessionid = sid;
     document.getElementById('sessionIdDisplay').textContent = 'SID: ' + (sid || '-');
+    const card = document.getElementById('voiceChatCard');
+    const frame = document.getElementById('voiceChatFrame');
+    if (!sid) {
+        card.style.display = 'none';
+        frame.removeAttribute('src');
+        return;
+    }
+
+    const src = '/asr/index.html?sessionid=' + encodeURIComponent(sid);
+    if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
+    card.style.display = 'block';
 }
 
 function openVoiceChat(event) {
@@ -256,8 +280,7 @@ function openVoiceChat(event) {
         return false;
     }
     event.preventDefault();
-    const url = '/asr/index.html?sessionid=' + encodeURIComponent(sessionid);
-    window.open(url, '_blank', 'noopener');
+    document.getElementById('voiceChatCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     return false;
 }
 
