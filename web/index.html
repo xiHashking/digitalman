@@ -190,14 +190,17 @@
             </div>
 
             <!-- 3. Inline Voice Chat -->
-            <div class="glass-card" id="voiceChatCard" style="display:none;">
+            <div class="glass-card" id="voiceChatCard">
                 <div class="card-header"><i class="bi bi-mic-fill"></i> 语音对话</div>
                 <div class="card-body p-2">
+                    <div id="voiceChatHint" class="text-muted small p-3">
+                        请先点击上方“开始连接”，连接成功后即可在这里使用麦克风对话。
+                    </div>
                     <iframe
                         id="voiceChatFrame"
                         title="语音对话"
                         allow="microphone"
-                        style="display:block;width:100%;height:560px;border:0;border-radius:8px;background:#fff;"
+                        style="display:none;width:100%;height:560px;border:0;border-radius:8px;background:#fff;"
                     ></iframe>
                 </div>
             </div>
@@ -261,9 +264,12 @@ function setSessionId(sid) {
     sessionid = sid;
     document.getElementById('sessionIdDisplay').textContent = 'SID: ' + (sid || '-');
     const card = document.getElementById('voiceChatCard');
+    const hint = document.getElementById('voiceChatHint');
     const frame = document.getElementById('voiceChatFrame');
     if (!sid) {
-        card.style.display = 'none';
+        card.style.display = 'block';
+        hint.style.display = 'block';
+        frame.style.display = 'none';
         frame.removeAttribute('src');
         return;
     }
@@ -271,6 +277,8 @@ function setSessionId(sid) {
     const src = '/asr/index.html?sessionid=' + encodeURIComponent(sid);
     if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
     card.style.display = 'block';
+    hint.style.display = 'none';
+    frame.style.display = 'block';
 }
 
 function openVoiceChat(event) {
