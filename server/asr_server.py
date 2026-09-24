@@ -243,6 +243,10 @@ async def asr_websocket_handler(request):
             elif msg.type == web.WSMsgType.BINARY:
                 audio_buffer.extend(msg.data)
                 chunks_received += 1
+                if chunks_received == 1:
+                    logger.info(
+                        f"[ASR] 🎧 First audio chunk received ({len(msg.data):,} bytes)"
+                    )
 
             elif msg.type in (web.WSMsgType.ERROR, web.WSMsgType.CLOSE):
                 break

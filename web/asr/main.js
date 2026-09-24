@@ -519,18 +519,29 @@ function getConnState( connState ) {
 
 function record()
 {
+		if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+			info_div.innerHTML = "麦克风需要 HTTPS；请在 Mac 本机用 http://127.0.0.1:8010 打开，或为局域网地址配置 HTTPS";
+			console.error("[ASR] Microphone requires a secure context", window.location.href);
+			return;
+		}
 
-		 rec.open( function(){
+		rec.open( function(){
 			speechDetected = false;
 			silenceSince = 0;
 			recordingStartedAt = Date.now();
-		 rec.start();
+			rec.start();
 		 console.log("开始");
 			btnStart.disabled = true;
 			btnStop.disabled = false;
 			btnConnect.disabled=true;
-		 });
- 
+		}, function(errMsg, isUserNotAllow){
+			var detail = isUserNotAllow ? "请允许浏览器使用麦克风" : String(errMsg || "未知错误");
+			info_div.innerHTML = "麦克风打开失败：" + detail;
+			console.error("[ASR] Microphone open failed", errMsg, isUserNotAllow);
+			btnStart.disabled = false;
+			btnStop.disabled = true;
+		});
+
 }
 
  
