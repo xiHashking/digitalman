@@ -40,9 +40,14 @@ def _llm_client(opt):
             'LLM API key is not configured; set LLM_API_KEY or '
             f"{cfg['api_key_env']}"
         )
+    try:
+        timeout = float(os.getenv('LLM_TIMEOUT', '20'))
+    except ValueError:
+        timeout = 20.0
     return OpenAI(
         api_key=api_key,
         base_url=base_url,
+        timeout=timeout,
     )
 
 
@@ -60,11 +65,16 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
         model = _llm_model(opt)
         end = time.perf_counter()
         logger.info(f"llm Time init: {end-start}s,{message}")
+        try:
+            max_tokens = int(os.getenv('LLM_MAX_TOKENS', '128'))
+        except ValueError:
+            max_tokens = 128
         completion = client.chat.completions.create(
             model=model,
             messages=[{'role': 'system', 'content': '你是一个知识助手，尽量以简短、口语化的方式输出'},
                     {'role': 'user', 'content': message}],
             stream=True,
+            max_tokens=max_tokens,
             # Display token usage in the last line of the streamed response.
             stream_options={"include_usage": True}
         )

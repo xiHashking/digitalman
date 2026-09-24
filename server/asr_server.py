@@ -17,6 +17,7 @@ import time
 import io
 import asyncio
 import threading
+import os
 import numpy as np
 from aiohttp import web
 
@@ -90,10 +91,14 @@ def _run_inference(audio_float32: np.ndarray, sample_rate: int, use_itn: bool):
 
     t0 = time.perf_counter()
     with _sensevoice_inference_lock:
+        # This installation is intended for Chinese voice Q&A.  Auto language
+        # detection can misclassify short Chinese utterances (for example as
+        # Korean "뭐"), which may make downstream LLM gateways stall.
+        language = os.getenv("ASR_LANGUAGE", "zh")
         res = model.generate(
             input=wav_buf,
             cache={},
-            language="auto",
+            language=language,
             use_itn=use_itn,
             batch_size_s=60,
         )
