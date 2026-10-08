@@ -1,12 +1,107 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from knowledge_base import KnowledgeMatch, KnowledgeSearchResult
-from llm import SpeechSegmenter, llm_response
+from llm import (
+    AI_LITERACY_PRODUCT_POLICY,
+    SpeechSegmenter,
+    _build_system_prompt,
+    _requires_ai_literacy_policy_reasoning,
+    llm_response,
+)
 
 
 class SpeechSegmenterTestCase(unittest.TestCase):
+    def test_ai_literacy_policy_is_injected_for_matching_product(self):
+        result = KnowledgeSearchResult(
+            query="AI素养评价是什么？",
+            matches=(
+                KnowledgeMatch(
+                    title="AI素养评价产品介绍",
+                    text="产品资料",
+                    score=10,
+                    coverage=1,
+                    matched_terms=("素养评价",),
+                ),
+            ),
+        )
+
+        prompt = _build_system_prompt("AI素养评价是什么？", result, 6000)
+
+        self.assertIn(AI_LITERACY_PRODUCT_POLICY, prompt)
+        self.assertIn("AI不能自动决定学生优劣", prompt)
+        self.assertIn("需要进一步确认", prompt)
+        self.assertNotIn("现有资料没有明确说明", prompt)
+
+    def test_ai_literacy_policy_is_not_injected_for_other_products(self):
+        result = KnowledgeSearchResult(query="招生系统有什么功能？", matches=())
+
+        prompt = _build_system_prompt("招生系统有什么功能？", result, 6000)
+
+        self.assertNotIn(AI_LITERACY_PRODUCT_POLICY, prompt)
+
+    def test_policy_guard_recognizes_ai_boundary_and_commitment_questions(self):
+        ai_result = KnowledgeSearchResult(
+            query="",
+            matches=(
+                KnowledgeMatch(
+                    title="AI素养评价产品QA/AI素养评价产品QA",
+                    text="",
+                    score=10,
+                    coverage=1,
+                    matched_terms=(),
+                    kind="qa",
+                ),
+            ),
+        )
+
+        self.assertTrue(
+            _requires_ai_literacy_policy_reasoning("AI可以自动给学生打分吗？", ai_result)
+        )
+        self.assertTrue(
+            _requires_ai_literacy_policy_reasoning("能完全替代老师录入吗？", ai_result)
+        )
+        self.assertTrue(
+            _requires_ai_literacy_policy_reasoning("能保证一个月上线吗？", ai_result)
+        )
+
+    def test_policy_guard_prevents_wrong_qa_from_bypassing_llm(self):
+        result = KnowledgeSearchResult(
+            query="AI可以自动给学生打分吗？",
+            matches=(
+                KnowledgeMatch(
+                    title="AI素养评价产品QA/AI素养评价产品QA",
+                    text="错误候选答案",
+                    score=50,
+                    coverage=0.5,
+                    matched_terms=("学生",),
+                    kind="qa",
+                    standard_question="系统能否进行家校互动？",
+                    standard_answer="错误候选答案",
+                ),
+            ),
+        )
+        create = Mock(return_value=[])
+        client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=create)),
+        )
+        avatar = SimpleNamespace(
+            opt=SimpleNamespace(),
+            put_msg_txt=Mock(),
+        )
+
+        with (
+            patch("llm.search_knowledge", return_value=result),
+            patch("llm._llm_client", return_value=client),
+            patch("llm._llm_model", return_value="test-model"),
+        ):
+            llm_response("AI可以自动给学生打分吗？", avatar)
+
+        system_prompt = create.call_args.kwargs["messages"][0]["content"]
+        self.assertIn(AI_LITERACY_PRODUCT_POLICY, system_prompt)
+        self.assertNotIn("错误候选答案", system_prompt)
+
     def test_emits_first_complete_sentence_while_stream_is_open(self):
         segmenter = SpeechSegmenter()
         self.assertEqual(segmenter.feed('没问题，我给您简单介绍一下'), [])
