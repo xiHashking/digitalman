@@ -1,5 +1,6 @@
 import time
 import asyncio
+import os
 import numpy as np
 import resampy
 import soundfile as sf
@@ -17,11 +18,31 @@ class EdgeTTS(BaseTTS):
         voice = self.opt.REF_FILE or "zh-CN-YunxiaNeural" 
         voicename = textevent.get('tts', {}).get('ref_file',voice) #self.opt.REF_FILE #"zh-CN-YunxiaNeural"
         t = time.time()
-        asyncio.new_event_loop().run_until_complete(self.__main(voicename,text))
-        logger.info(f'-------edge tts time:{time.time()-t:.4f}s')
-        if self.input_stream.getbuffer().nbytes<=0: #edgetts err
-            logger.error('edgetts err!!!!!')
-            return
+        try:
+            max_attempts = max(1, int(os.getenv('EDGE_TTS_MAX_ATTEMPTS', '2')))
+        except ValueError:
+            max_attempts = 2
+
+        success = False
+        for attempt in range(1, max_attempts + 1):
+            self.input_stream.seek(0)
+            self.input_stream.truncate()
+            success = asyncio.run(self.__main(voicename, text))
+            if success and self.input_stream.getbuffer().nbytes > 0:
+                break
+            if self.state != State.RUNNING:
+                return
+            if attempt < max_attempts:
+                logger.warning('[TTS] Edge attempt %d/%d failed; retrying', attempt, max_attempts)
+                time.sleep(0.2 * attempt)
+
+        logger.info(
+            '-------edge tts time:%.4fs attempts=%d',
+            time.time() - t,
+            attempt,
+        )
+        if not success or self.input_stream.getbuffer().nbytes <= 0:
+            raise RuntimeError(f'Edge TTS failed after {max_attempts} attempts')
         
         self.input_stream.seek(0)
         stream = self.__create_bytes_stream(self.input_stream)
@@ -58,20 +79,23 @@ class EdgeTTS(BaseTTS):
 
         return stream
     
-    async def __main(self,voicename: str, text: str):
+    async def __main(self,voicename: str, text: str) -> bool:
         try:
-            communicate = edge_tts.Communicate(text, voicename)
+            communicate = edge_tts.Communicate(
+                text,
+                voicename,
+                connect_timeout=2,
+                receive_timeout=15,
+            )
 
-            #with open(OUTPUT_FILE, "wb") as file:
-            first = True
+            received_audio = False
             async for chunk in communicate.stream():
-                if first:
-                    first = False
                 if chunk["type"] == "audio" and self.state==State.RUNNING:
-                    #self.push_audio(chunk["data"])
                     self.input_stream.write(chunk["data"])
-                    #file.write(chunk["data"])
+                    received_audio = True
                 elif chunk["type"] == "WordBoundary":
                     pass
+            return received_audio
         except Exception as e:
-            logger.exception('edgetts')
+            logger.warning('[TTS] Edge connection failed: %s', e)
+            return False

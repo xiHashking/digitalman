@@ -24,7 +24,7 @@ TTS_SERVER: ''                 # TTS server URL, no trailing slash
 
 # -------- LLM ----------------------------------------------------------
 llm_provider: dashscope        # dashscope / orcarouter
-llm_model: ''                  # model override, empty = provider default (qwen-plus / orcarouter/auto)
+llm_model: qwen-turbo          # low-latency voice default; set qwen-plus for higher answer quality
 
 # -------- Transport ----------------------------------------------------------
 transport: webrtc              # rtcpush / webrtc / rtmp / virtualcam

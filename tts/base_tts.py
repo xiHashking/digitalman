@@ -101,6 +101,9 @@ class BaseTTS:
                 self._processing = True
             try:
                 self.txt_to_audio(msg)
+            except Exception:
+                logger.exception('TTS segment failed: %s', msg[0])
+                self.mark_playback_end(msg[1])
             finally:
                 with self._busy_lock:
                     self._processing = False

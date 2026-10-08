@@ -1,4 +1,6 @@
 import unittest
+import time
+from threading import Event, Thread
 from types import SimpleNamespace
 
 from tts.base_tts import BaseTTS, sanitize_tts_text
@@ -26,6 +28,26 @@ class SanitizeTTSTextTestCase(unittest.TestCase):
 
         tts.mark_playback_end(eventpoint)
         self.assertFalse(tts.is_busy())
+
+    def test_failed_segment_releases_busy_state_and_worker_survives(self):
+        class BrokenTTS(BaseTTS):
+            def txt_to_audio(self, msg):
+                raise RuntimeError('network failed')
+
+        tts = BrokenTTS(SimpleNamespace(fps=25), parent=object())
+        quit_event = Event()
+        worker = Thread(target=tts.process_tts, args=(quit_event,), daemon=True)
+        worker.start()
+        tts.put_msg_txt('测试失败清理')
+
+        deadline = time.time() + 1
+        while tts.is_busy() and time.time() < deadline:
+            time.sleep(0.01)
+
+        self.assertFalse(tts.is_busy())
+        self.assertTrue(worker.is_alive())
+        quit_event.set()
+        worker.join(timeout=2)
 
 
 if __name__ == '__main__':

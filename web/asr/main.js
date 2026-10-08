@@ -50,13 +50,15 @@ var file_data_array;  // array to save file data
  
 var totalsend=0;
 var speechDetected = false;
+var speechCandidateSince = 0;
 var silenceSince = 0;
 var recordingStartedAt = 0;
 var autoStopTimer = null;
 
 // Submit a turn after a short pause once the user has actually spoken.  The
 // FunASR protocol only produces the final transcript after is_speaking=false.
-var SPEECH_LEVEL_THRESHOLD = 8;
+var SPEECH_LEVEL_THRESHOLD = 10;
+var SPEECH_CONFIRM_MS = 120;
 var AUTO_STOP_SILENCE_MS = 700;
 var MIN_RECORDING_MS = 450;
 var kioskMode = new URLSearchParams(window.location.search).get("kiosk") === "1";
@@ -448,6 +450,7 @@ function resumeRecording() {
 	if (wsconnecter.wsIsOpen() && wsconnecter.wsBegin()) {
 		isRec = true;
 		speechDetected = false;
+		speechCandidateSince = 0;
 		silenceSince = 0;
 		recordingStartedAt = Date.now();
 		rec.start()
@@ -565,6 +568,7 @@ function record()
 
 		rec.open( function(){
 			speechDetected = false;
+			speechCandidateSince = 0;
 			silenceSince = 0;
 			recordingStartedAt = Date.now();
 				rec.start();
@@ -651,6 +655,7 @@ function stop() {
 	
 	isRec = false;
 	speechDetected = false;
+	speechCandidateSince = 0;
 	silenceSince = 0;
 	info_div.innerHTML="发送完数据,请等候,正在识别...";
 	postKioskState("recognizing");
@@ -704,16 +709,27 @@ function clear() {
  
 function recProcess( buffer, powerLevel, bufferDuration, bufferSampleRate,newBufferIdx,asyncEnd ) {
 	if ( isRec === true ) {
+		var now = Date.now();
 		if (powerLevel >= SPEECH_LEVEL_THRESHOLD) {
-			speechDetected = true;
-			silenceSince = 0;
+			if (speechDetected) {
+				silenceSince = 0;
+			} else {
+				if (!speechCandidateSince) speechCandidateSince = now;
+				if (now - speechCandidateSince >= SPEECH_CONFIRM_MS) {
+					speechDetected = true;
+					silenceSince = 0;
+				}
+			}
 		} else if (speechDetected && bufferDuration >= MIN_RECORDING_MS) {
-			if (!silenceSince) silenceSince = Date.now();
-			if (Date.now() - silenceSince >= AUTO_STOP_SILENCE_MS) {
+			speechCandidateSince = 0;
+			if (!silenceSince) silenceSince = now;
+			if (now - silenceSince >= AUTO_STOP_SILENCE_MS) {
 				info_div.innerHTML="检测到停顿，正在识别...";
 				stop();
 				return;
 			}
+		} else {
+			speechCandidateSince = 0;
 		}
 
 		var data_48k = buffer[buffer.length-1];
