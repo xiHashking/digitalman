@@ -54,8 +54,8 @@ _AI_LITERACY_BOUNDARY_RE = re.compile(
     r"AI.{0,8}(给)?学生.{0,6}(评分|打分|评判|发布)|"
     r"(完全)?(代替|替代)(老师|教师)|"
     r"(不需要|无需).{0,6}(老师|教师).{0,8}(录入|确认|审核)|"
-    r"真实动机|判断学生.{0,8}(故意|动机)|学生优劣|"
-    r"(一个|单一).{0,4}分数.{0,8}(定义|判断|决定|区分)|"
+    r"真实动机|判断(学生|孩子).{0,8}(故意|动机)|学生优劣|"
+    r"(一个|单一).{0,4}分数.{0,10}(定义|判断|决定|区分|选出)|"
     r"未经.{0,8}审核|不经过.{0,8}(老师|教师|学校).{0,5}审核|"
     r"替学校.{0,4}(决策|决定)|学校.{0,8}(决定|决策).{0,6}(交给|由).{0,4}AI|"
     r"AI.{0,8}(学校管理|管理决定|学校决策)|"
@@ -78,12 +78,36 @@ _COMPANY_BACKGROUND_RE = re.compile(
     r"(服务|覆盖).{0,8}(学生|学校|客户).{0,6}(数量|多少|几个|几所))",
     re.IGNORECASE,
 )
+_UNVERIFIED_COMMITMENT_RE = re.compile(
+    r"((一个月|[一二三四五六七八九十两0-9]+(天|周|个月)).{0,12}"
+    r"(完成|上线|交付|做好).{0,10}(个性化|定制|接口).{0,6}(开发|对接)?|"
+    r"(个性化|定制|接口).{0,8}(开发|对接).{0,12}"
+    r"(一个月|多久|几天|几周|完成|上线|交付)|"
+    r"(保证|承诺).{0,12}(个性化|定制|接口).{0,6}(开发|对接|完成))",
+    re.IGNORECASE,
+)
 _INCOHERENT_ASR_RE = re.compile(
     r"^(的话的问题|提是解决然后|小公部分呢其他的)$|"
-    r"小红书.{0,12}(实页|个分).{0,8}(这个|呀)",
+    r"小红书.{0,12}(实页|个分).{0,8}(这个|呀)|"
+    r"^产品没有问$",
+    re.IGNORECASE,
+)
+_SHORT_QUERY_INTENT_RE = re.compile(
+    r"什么|怎么|如何|为什么|多少|哪里|哪种|哪类|能不能|可不可以|"
+    r"是否|是不是|有没有|介绍|讲讲|说说|区别|作用|功能|帮助|吗$|呢$"
+)
+_SHORT_DOMAIN_RE = re.compile(
+    r"AI|素养|评价|学生|孩子|教师|老师|学校|家长|考生|招生|就业|"
+    r"系统|产品|公司|数据|报告|档案|五育|德育|体育|美育|劳育|"
+    r"教研|培训|职称|简历|岗位|招聘|面试|一体机|宣传屏|开放日",
+    re.IGNORECASE,
+)
+_SHORT_CASUAL_RE = re.compile(
+    r"^(你好|您好|嗨|哈喽|谢谢|感谢|再见|拜拜|好的|好吧|测试)[啊呀呢吗吧哦！!。,.，？?]*$",
     re.IGNORECASE,
 )
 _ASR_QUERY_REPLACEMENTS = (
+    (re.compile(r"(?i)(?<![a-z])a[\s._-]*i(?![a-z])"), "AI"),
     (re.compile(r"二零四用评价"), "AI素养评价"),
 )
 
@@ -224,8 +248,21 @@ def _ai_literacy_boundary_answer(message: str) -> str:
 
 def _direct_guard_answer(message: str) -> str:
     compact = re.sub(r"\s+", "", message or "")
-    if _INCOHERENT_ASR_RE.search(compact):
+    if (
+        _INCOHERENT_ASR_RE.search(compact)
+        or (
+            2 <= len(compact) <= 10
+            and not _SHORT_CASUAL_RE.fullmatch(compact)
+            and not _SHORT_QUERY_INTENT_RE.search(compact)
+            and not _SHORT_DOMAIN_RE.search(compact)
+        )
+    ):
         return "抱歉，我没听清，请再说一遍。"
+    if _UNVERIFIED_COMMITMENT_RE.search(compact):
+        return (
+            "现有资料不能确认这个周期，需要团队根据具体需求和接口范围评估后再答复，"
+            "不能直接承诺。"
+        )
     if _COMPANY_BACKGROUND_RE.search(compact):
         if re.search(r"(服务|覆盖).{0,12}(学生|学校|客户)", compact):
             return "现有资料没有明确说明已服务或覆盖的具体数量，这项数据需要进一步确认。"

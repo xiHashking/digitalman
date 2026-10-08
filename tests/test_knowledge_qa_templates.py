@@ -4,7 +4,14 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from knowledge_base import KnowledgeBase
+from knowledge_base import (
+    KnowledgeBase,
+    _ADMISSIONS_EMPLOYMENT_QA_SCOPE,
+    _AI_LITERACY_QA_SCOPE,
+    _TEACHER_DEVELOPMENT_QA_SCOPE,
+    _priority_qa_intent,
+    _priority_qa_scopes,
+)
 
 
 class KnowledgeQaTemplateTestCase(unittest.TestCase):
@@ -124,6 +131,65 @@ class KnowledgeQaTemplateTestCase(unittest.TestCase):
             result.matches[0].standard_question,
             "系统能生成教师个人成长报告吗？",
         )
+
+    def test_broader_product_cues_route_to_the_expected_qa_scope(self):
+        ai_literacy_queries = (
+            "小学能用吗",
+            "学校先试几个班怎么开始",
+            "拍照上传奖状能形成成长记录吗",
+            "已有德育系统还能对接吗",
+            "怎样避免评价凭印象",
+        )
+        teacher_queries = (
+            "怎么建设骨干教师梯队",
+            "教师画像能看什么",
+            "一核三库五应用是什么意思",
+        )
+        admissions_queries = (
+            "开放日可以登记家长意向吗",
+            "能提供职业规划吗",
+            "一体机能做校园导览吗",
+        )
+
+        for query in ai_literacy_queries:
+            self.assertEqual(_priority_qa_scopes(query), {_AI_LITERACY_QA_SCOPE})
+        for query in teacher_queries:
+            self.assertEqual(
+                _priority_qa_scopes(query),
+                {_TEACHER_DEVELOPMENT_QA_SCOPE},
+            )
+        for query in admissions_queries:
+            self.assertEqual(
+                _priority_qa_scopes(query),
+                {_ADMISSIONS_EMPLOYMENT_QA_SCOPE},
+            )
+
+    def test_high_confidence_paraphrases_route_directly_to_templates(self):
+        cases = (
+            (
+                "评价会不会全凭老师印象",
+                (_AI_LITERACY_QA_SCOPE, "如何保证评价的客观公正"),
+            ),
+            (
+                "学校先拿两个班试试看",
+                (_AI_LITERACY_QA_SCOPE, "从部署到上线需要多长时间"),
+            ),
+            (
+                "能接学校的人事和教务平台吗",
+                (_TEACHER_DEVELOPMENT_QA_SCOPE, "能否和学校已有系统对接"),
+            ),
+            (
+                "招生就业平台主要解决校方哪些难题",
+                (_ADMISSIONS_EMPLOYMENT_QA_SCOPE, "这套系统主要解决学校什么问题"),
+            ),
+            (
+                "校园开放日人挤人时能分担接待吗",
+                (_ADMISSIONS_EMPLOYMENT_QA_SCOPE, "开放日现场人很多"),
+            ),
+        )
+
+        for query, expected in cases:
+            self.assertEqual(_priority_qa_intent(query), expected, query)
 
     def test_ambiguous_semantic_only_match_is_rejected(self):
         with (

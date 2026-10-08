@@ -67,6 +67,7 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         for question in (
             "AI自己给学生打分并发布可以吗？",
             "AI能判断学生是不是故意的吗？",
+            "能判断孩子是故意犯错的吗？",
             "能根据一个分数判断哪个学生更优秀吗？",
             "完全不需要老师录入和确认吗？",
             "可以不经过老师审核直接给家长看吗？",
@@ -133,6 +134,25 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         client_factory.assert_not_called()
         self.assertIn("需要进一步确认", "".join(spoken))
 
+    def test_unverified_custom_development_timeline_is_not_promised(self):
+        spoken = []
+        avatar = SimpleNamespace(
+            opt=SimpleNamespace(),
+            put_msg_txt=lambda text, data: spoken.append(text),
+        )
+
+        with (
+            patch("llm.search_knowledge") as search,
+            patch("llm._llm_client") as client_factory,
+        ):
+            llm_response("能不能一个月之内完成个性化开发？", avatar)
+
+        search.assert_not_called()
+        client_factory.assert_not_called()
+        speech = "".join(spoken)
+        self.assertIn("需要团队", speech)
+        self.assertIn("不能直接承诺", speech)
+
     def test_incoherent_asr_is_not_repeated(self):
         self.assertEqual(
             _direct_guard_answer("你看在小红书上实页个分是这个呀"),
@@ -142,11 +162,27 @@ class SpeechSegmenterTestCase(unittest.TestCase):
             _direct_guard_answer("的话的问题"),
             "抱歉，我没听清，请再说一遍。",
         )
+        for fragment in (
+            "产品没有问",
+            "那就因为他",
+            "没有是",
+            "今天手感特很",
+            "就比如先应加评论这种",
+        ):
+            self.assertEqual(
+                _direct_guard_answer(fragment),
+                "抱歉，我没听清，请再说一遍。",
+                fragment,
+            )
 
     def test_common_asr_product_name_is_normalized(self):
         self.assertEqual(
             _normalize_asr_query("介绍一下什么是二零四用评价"),
             "介绍一下什么是AI素养评价",
+        )
+        self.assertEqual(
+            _normalize_asr_query("介绍一下 a i 素养评价"),
+            "介绍一下 AI 素养评价",
         )
 
     def test_emits_first_complete_sentence_while_stream_is_open(self):
