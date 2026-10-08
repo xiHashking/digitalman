@@ -96,6 +96,14 @@ Linux CUDA 环境搭建参考: <https://zhuanlan.zhihu.com/p/674972886>
 python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1
 ```
 
+如需启用本地知识库，将 `KNOWLEDGE_BASE_DIR` 指向 Markdown/文本资料目录：
+
+```bash
+KNOWLEDGE_BASE_DIR=/path/to/knowledge-base python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1
+```
+
+知识库只会向模型注入达到相关度门槛的资料，寒暄和无关问题会跳过检索。每轮检索会在日志中记录命中文档、分数、覆盖率和关键词。可通过 `KB_TOP_K`（默认 `4`）、`KB_MIN_SCORE`（默认 `6.0`）、`KB_MIN_COVERAGE`（默认 `0.16`）和 `KB_MAX_CONTEXT_CHARS`（默认 `6000`）调整召回范围。
+
 
 >  **注意**: 服务端需开放端口 TCP:8010, UDP:1-65536  
 
