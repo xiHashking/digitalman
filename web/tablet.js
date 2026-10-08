@@ -187,34 +187,11 @@
         }
     }
 
-    async function ensureMicrophonePermission() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('当前浏览器不支持麦克风采集');
-        }
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop());
-    }
-
     async function startExperience() {
         if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
             const httpsUrl = 'https://' + window.location.hostname + ':8443/tablet.html';
             elements.startHint.textContent = '先安装本机 CA 证书，再访问 ' + httpsUrl;
             showToast('安卓 Chrome 需要可信 HTTPS 才能使用麦克风', 6000);
-            return;
-        }
-        elements.startButton.disabled = true;
-        elements.startHint.textContent = '正在请求麦克风权限';
-        try {
-            await ensureMicrophonePermission();
-        } catch (error) {
-            const denied = error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError');
-            const message = denied
-                ? '麦克风权限被拒绝，请在浏览器站点设置中允许麦克风'
-                : (error && error.message ? error.message : '无法打开麦克风');
-            elements.startButton.disabled = false;
-            elements.startHint.textContent = message;
-            setStatus('麦克风不可用', 'error');
-            showToast(message, 6000);
             return;
         }
         toggleFullscreen();
