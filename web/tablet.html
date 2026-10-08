@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <meta name="theme-color" content="#090b0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>数字人助手</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <style>
+        :root {
+            color-scheme: dark;
+            --surface: rgba(14, 18, 24, 0.78);
+            --surface-strong: rgba(14, 18, 24, 0.94);
+            --line: rgba(255, 255, 255, 0.18);
+            --text: #f7f8fa;
+            --muted: #b8c0cc;
+            --accent: #38d39f;
+            --accent-dark: #102a22;
+            --danger: #ff626a;
+            --control-size: clamp(52px, 6.5vw, 68px);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #090b0f;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            letter-spacing: 0;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        button { font: inherit; }
+
+        .stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            isolation: isolate;
+            background: #090b0f;
+        }
+
+        .avatar-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #090b0f;
+        }
+
+        .top-bar {
+            position: absolute;
+            z-index: 3;
+            top: 0;
+            left: 0;
+            right: 0;
+            min-height: calc(72px + env(safe-area-inset-top));
+            padding: calc(14px + env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 10px max(18px, env(safe-area-inset-left));
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent);
+            pointer-events: none;
+        }
+
+        .status {
+            display: inline-flex;
+            min-width: 0;
+            align-items: center;
+            gap: 9px;
+            padding: 9px 13px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            font-size: 14px;
+            font-weight: 650;
+            pointer-events: auto;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            flex: 0 0 auto;
+            border-radius: 50%;
+            background: #8c96a5;
+            box-shadow: 0 0 0 4px rgba(140, 150, 165, 0.16);
+        }
+
+        .status[data-state="online"] .status-dot,
+        .status[data-state="listening"] .status-dot {
+            background: var(--accent);
+            box-shadow: 0 0 0 4px rgba(56, 211, 159, 0.18);
+        }
+
+        .status[data-state="error"] .status-dot {
+            background: var(--danger);
+            box-shadow: 0 0 0 4px rgba(255, 98, 106, 0.18);
+        }
+
+        .top-actions { display: flex; gap: 10px; pointer-events: auto; }
+
+        .icon-button,
+        .action-button {
+            border: 1px solid var(--line);
+            color: var(--text);
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            cursor: pointer;
+            transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
+        }
+
+        .icon-button {
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+        }
+
+        .icon-button:active,
+        .action-button:active { transform: scale(0.96); }
+
+        .icon-button:focus-visible,
+        .action-button:focus-visible,
+        .start-button:focus-visible {
+            outline: 3px solid rgba(56, 211, 159, 0.62);
+            outline-offset: 3px;
+        }
+
+        svg {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .start-layer {
+            position: absolute;
+            z-index: 5;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background: rgba(5, 7, 10, 0.82);
+            transition: opacity 200ms ease, visibility 200ms ease;
+        }
+
+        .start-layer.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        .start-content { text-align: center; }
+
+        .start-content h1 {
+            margin: 0 0 10px;
+            font-size: clamp(28px, 4vw, 48px);
+            line-height: 1.15;
+            letter-spacing: 0;
+        }
+
+        .start-content p {
+            margin: 0 0 26px;
+            color: var(--muted);
+            font-size: clamp(15px, 1.8vw, 19px);
+        }
+
+        .start-button {
+            min-width: 180px;
+            min-height: 58px;
+            border: 0;
+            border-radius: 8px;
+            padding: 0 28px;
+            color: #07150f;
+            background: var(--accent);
+            font-weight: 750;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .start-button:disabled { opacity: 0.55; cursor: wait; }
+
+        .bottom-panel {
+            position: absolute;
+            z-index: 3;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 54px max(18px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.78), transparent);
+            pointer-events: none;
+        }
+
+        .transcript {
+            width: min(720px, calc(100vw - 36px));
+            min-height: 22px;
+            margin: 0;
+            color: #fff;
+            text-align: center;
+            font-size: clamp(16px, 2vw, 21px);
+            line-height: 1.45;
+            text-shadow: 0 2px 12px #000;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 160ms ease, transform 160ms ease;
+        }
+
+        .transcript.visible { opacity: 1; transform: translateY(0); }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .action-button {
+            min-width: 112px;
+            height: var(--control-size);
+            padding: 0 18px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            font-weight: 700;
+        }
+
+        .action-button:disabled { opacity: 0.42; cursor: not-allowed; }
+
+        .mic-button {
+            min-width: 154px;
+            color: #07150f;
+            background: var(--accent);
+            border-color: transparent;
+        }
+
+        .mic-button.paused {
+            color: var(--text);
+            background: var(--surface-strong);
+            border-color: var(--line);
+        }
+
+        .interrupt-button { color: #fff; }
+        .interrupt-button:not(:disabled) { border-color: rgba(255, 98, 106, 0.55); }
+
+        .toast {
+            position: absolute;
+            z-index: 8;
+            top: calc(82px + env(safe-area-inset-top));
+            left: 50%;
+            max-width: min(560px, calc(100vw - 36px));
+            padding: 11px 15px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            color: var(--text);
+            background: var(--surface-strong);
+            transform: translate(-50%, -8px);
+            opacity: 0;
+            visibility: hidden;
+            text-align: center;
+            transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
+        }
+
+        .toast.visible { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+
+        .asr-frame {
+            position: fixed;
+            width: 1px;
+            height: 1px;
+            left: -10px;
+            bottom: -10px;
+            border: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @media (orientation: portrait) {
+            .top-bar { align-items: flex-start; }
+            .action-button { min-width: 104px; padding: 0 14px; }
+            .mic-button { min-width: 142px; }
+        }
+
+        @media (max-width: 520px) {
+            .button-label { display: none; }
+            .action-button { min-width: var(--control-size); width: var(--control-size); padding: 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; }
+        }
+    </style>
+</head>
+<body>
+<main class="stage" id="stage">
+    <video class="avatar-video" id="video" autoplay playsinline muted></video>
+    <audio id="audio" autoplay></audio>
+
+    <header class="top-bar">
+        <div class="status" id="status" data-state="idle" role="status" aria-live="polite">
+            <span class="status-dot"></span>
+            <span id="statusText">等待启动</span>
+        </div>
+        <div class="top-actions">
+            <button class="icon-button" id="reconnectButton" type="button" aria-label="重新连接" title="重新连接">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.2 6.5L3 16"/><path d="M3 21v-5h5"/><path d="M3 12A9 9 0 0 1 18.2 5.5L21 8"/><path d="M21 3v5h-5"/></svg>
+            </button>
+            <button class="icon-button" id="fullscreenButton" type="button" aria-label="进入全屏" title="进入全屏">
+                <svg id="fullscreenIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <section class="start-layer" id="startLayer">
+        <div class="start-content">
+            <h1>数字人助手</h1>
+            <p id="startHint">轻触开始语音对话</p>
+            <button class="start-button" id="startButton" type="button">开始</button>
+        </div>
+    </section>
+
+    <section class="bottom-panel" aria-label="语音对话控制">
+        <p class="transcript" id="transcript" aria-live="polite"></p>
+        <div class="controls">
+            <button class="action-button mic-button" id="micButton" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+                <span class="button-label" id="micLabel">聆听中</span>
+            </button>
+            <button class="action-button interrupt-button" id="interruptButton" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="5" y="5" rx="2"/></svg>
+                <span class="button-label">打断</span>
+            </button>
+        </div>
+    </section>
+
+    <div class="toast" id="toast" role="alert"></div>
+    <iframe class="asr-frame" id="asrFrame" title="语音识别" allow="microphone"></iframe>
+</main>
+<script src="/tablet.js"></script>
+</body>
+</html>

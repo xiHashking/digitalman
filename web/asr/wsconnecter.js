@@ -65,36 +65,39 @@ function WebSocketConnectMethod( config ) { //定义socket连接方法类
 	this.wsIsOpen = function () {
 		return speechSokt !== undefined && speechSokt.readyState === 1;
 	};
-	
-	// SOCEKT连接中的消息与状态响应
-	function onOpen( e ) {
-		// 发送json
-		var chunk_size = new Array( 5, 10, 5 );
+
+	this.wsBegin = function () {
+		if (speechSokt !== undefined && speechSokt.readyState === 1) {
+			speechSokt.send(JSON.stringify(buildStartRequest()));
+			return true;
+		}
+		return false;
+	};
+
+	function buildStartRequest() {
 		var request = {
-			"chunk_size": chunk_size,
-			"wav_name":  "h5",
-			"is_speaking":  true,
-			"chunk_interval":10,
-			"itn":getUseITN(),
-			"mode":getAsrMode(),
-			
+			"chunk_size": new Array(5, 10, 5),
+			"wav_name": "h5",
+			"is_speaking": true,
+			"chunk_interval": 10,
+			"itn": getUseITN(),
+			"mode": getAsrMode(),
 		};
-		if(isfilemode)
-		{
-			request.wav_format=file_ext;
-			if(file_ext=="wav")
-			{
-				request.wav_format="PCM";
-				request.audio_fs=file_sample_rate;
+		if (isfilemode) {
+			request.wav_format = file_ext;
+			if (file_ext == "wav") {
+				request.wav_format = "PCM";
+				request.audio_fs = file_sample_rate;
 			}
 		}
-		
-		var hotwords=getHotwords();
- 
-		if(hotwords!=null  )
-		{
-			request.hotwords=hotwords;
-		}
+		var hotwords = getHotwords();
+		if (hotwords != null) request.hotwords = hotwords;
+		return request;
+	}
+
+	// SOCEKT连接中的消息与状态响应
+	function onOpen( e ) {
+		var request = buildStartRequest();
 		console.log(JSON.stringify(request));
 		speechSokt.send(JSON.stringify(request));
 		console.log("连接成功");

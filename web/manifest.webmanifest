@@ -1,0 +1,20 @@
+{
+  "name": "LiveTalking 数字人助手",
+  "short_name": "数字人助手",
+  "description": "LiveTalking 安卓平板语音对话界面",
+  "lang": "zh-CN",
+  "start_url": "/tablet.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#090b0f",
+  "theme_color": "#090b0f",
+  "icons": [
+    {
+      "src": "/tablet-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

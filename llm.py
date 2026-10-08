@@ -68,7 +68,8 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
         logger.info(f"llm Time init: {end-start}s,{message}")
         knowledge_context = get_knowledge_context(message)
         system_prompt = (
-            '你是一个知识助手，尽量以简短、口语化的方式输出。'
+            '你是一个通过语音交流的知识助手。回答必须简短、自然、口语化，通常不超过三句话和120个汉字。'
+            '不要使用Markdown、标题、项目符号、星号、下划线或表格；需要列举时直接用“第一、第二”。'
             '如果问题与知识库相关，优先依据知识库回答；资料没有覆盖时要明确说明，不能编造。'
         )
         if knowledge_context:
@@ -78,9 +79,9 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
                 + knowledge_context
             )
         try:
-            max_tokens = int(os.getenv('LLM_MAX_TOKENS', '256'))
+            max_tokens = int(os.getenv('LLM_MAX_TOKENS', '160'))
         except ValueError:
-            max_tokens = 256
+            max_tokens = 160
         completion = client.chat.completions.create(
             model=model,
             messages=[{'role': 'system', 'content': system_prompt},

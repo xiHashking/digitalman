@@ -57,8 +57,23 @@ var autoStopTimer = null;
 // Submit a turn after a short pause once the user has actually spoken.  The
 // FunASR protocol only produces the final transcript after is_speaking=false.
 var SPEECH_LEVEL_THRESHOLD = 8;
-var AUTO_STOP_SILENCE_MS = 900;
-var MIN_RECORDING_MS = 600;
+var AUTO_STOP_SILENCE_MS = 700;
+var MIN_RECORDING_MS = 450;
+var kioskMode = new URLSearchParams(window.location.search).get("kiosk") === "1";
+var kioskPaused = false;
+var kioskWaitingForAvatar = false;
+
+function postKioskMessage(type, payload) {
+	if (!kioskMode || window.parent === window) return;
+	window.parent.postMessage(Object.assign({
+		source: "livetalking-asr",
+		type: type,
+	}, payload || {}), window.location.origin);
+}
+
+function postKioskState(state, message) {
+	postKioskMessage("state", { state: state, message: message || "" });
+}
 
 // The current homepage stores the WebRTC session in JavaScript and passes it
 // through the voice-chat link. Keep compatibility with the legacy hidden input.
@@ -403,7 +418,7 @@ async function is_speaking() {
 
 async function waitSpeakingEnd() {
 	rec.stop() //关闭录音
-	for(let i=0;i<10;i++) {  //等待数字人开始讲话，最长等待10s
+	for(let i=0;i<30;i++) {  //等待回复链路进入忙碌状态，最长等待30s
 		bspeak = await is_speaking()
 		if(bspeak) {
 			break
@@ -411,22 +426,32 @@ async function waitSpeakingEnd() {
 		await sleep(1000)
 	}
 
-	while(true) {  //等待数字人讲话结束
+	for(let i=0;i<120;i++) {  //等待生成、合成和播放全部结束，最长等待2分钟
 		bspeak = await is_speaking()
 		if(!bspeak) {
 			break
 		}
 		await sleep(1000)
 	}
-	await sleep(2000)
-	// Resume capture for the next turn. stop() sets isRec=false, so restore it
-	// before starting the recorder or subsequent audio would be ignored.
-	if (wsconnecter.wsIsOpen()) {
+	await sleep(300)
+	kioskWaitingForAvatar = false;
+	resumeRecording();
+}
+
+function resumeRecording() {
+	if (kioskPaused) {
+		postKioskState("paused");
+		return;
+	}
+	// Each turn needs a fresh is_speaking=true frame so the ASR server clears
+	// its previous audio buffer before receiving the next utterance.
+	if (wsconnecter.wsIsOpen() && wsconnecter.wsBegin()) {
 		isRec = true;
 		speechDetected = false;
 		silenceSince = 0;
 		recordingStartedAt = Date.now();
 		rec.start()
+		postKioskState("listening");
 	}
 }
 // 语音识别结果; 对jsonMsg数据解析,将识别结果附加到编辑框中
@@ -439,17 +464,25 @@ function getJsonMessage( jsonMsg ) {
 	var timestamp=JSON.parse(jsonMsg.data)['timestamp'];
 	if(asrmodel=="2pass-offline" || asrmodel=="offline")
 	{
-		offline_text=offline_text+rectxt.replace(/ +/g,"")+'\n'; //handleWithTimestamp(rectxt,timestamp); //rectxt; //.replace(/ +/g,"");
+		var cleanText = rectxt.replace(/ +/g,"").trim();
+		offline_text=offline_text+cleanText+'\n'; //handleWithTimestamp(rectxt,timestamp); //rectxt; //.replace(/ +/g,"");
 		rec_text=offline_text;
 		const sessionid = getAvatarSessionId();
 		if (!sessionid) {
 			console.warn("[ASR] No active WebRTC session; transcript was not sent");
 			return;
 		}
+		if (!cleanText) {
+			resumeRecording();
+			return;
+		}
+		postKioskMessage("transcript", { text: cleanText });
+		postKioskState("waiting");
+		kioskWaitingForAvatar = true;
 		fetch('/human', {
-            body: JSON.stringify({
-                text: rectxt.replace(/ +/g,""),
-                type: 'chat',
+	            body: JSON.stringify({
+	                text: cleanText,
+	                type: 'chat',
 				sessionid: String(sessionid),
             }),
             headers: {
@@ -500,14 +533,17 @@ function getConnState( connState ) {
 			btnStart.disabled = false;
 			btnStop.disabled = true;
 			btnConnect.disabled=true;
+			postKioskState("ready");
+			if (kioskMode && !kioskPaused) record();
 		}
 	} else if ( connState === 1 ) {
-		//stop();
+		if (kioskMode && !kioskPaused) postKioskState("error", "语音识别连接已断开");
 	} else if ( connState === 2 ) {
 		stop();
 		console.log( 'connecttion error' );
-		 
-		alert("连接地址"+document.getElementById('wssip').value+"失败,请检查asr地址和端口。或试试界面上手动授权，再连接。");
+		var connectionError = "语音识别连接失败，请检查 ASR 服务";
+		if (kioskMode) postKioskState("error", connectionError);
+		else alert("连接地址"+document.getElementById('wssip').value+"失败,请检查asr地址和端口。或试试界面上手动授权，再连接。");
 		btnStart.disabled = true;
 		btnStop.disabled = true;
 		btnConnect.disabled=false;
@@ -518,9 +554,11 @@ function getConnState( connState ) {
 }
 
 function record()
-{
-		if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-			info_div.innerHTML = "麦克风需要 HTTPS；请在 Mac 本机用 http://127.0.0.1:8010 打开，或为局域网地址配置 HTTPS";
+	{
+			if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+				var secureMessage = "安卓平板需要通过 HTTPS 访问才能使用麦克风";
+				info_div.innerHTML = secureMessage;
+				postKioskState("error", secureMessage);
 			console.error("[ASR] Microphone requires a secure context", window.location.href);
 			return;
 		}
@@ -529,14 +567,17 @@ function record()
 			speechDetected = false;
 			silenceSince = 0;
 			recordingStartedAt = Date.now();
-			rec.start();
-		 console.log("开始");
+				rec.start();
+			 console.log("开始");
+			 postKioskState("listening");
 			btnStart.disabled = true;
 			btnStop.disabled = false;
 			btnConnect.disabled=true;
 		}, function(errMsg, isUserNotAllow){
 			var detail = isUserNotAllow ? "请允许浏览器使用麦克风" : String(errMsg || "未知错误");
-			info_div.innerHTML = "麦克风打开失败：" + detail;
+				var micError = "麦克风打开失败：" + detail;
+				info_div.innerHTML = micError;
+				postKioskState("error", micError);
 			console.error("[ASR] Microphone open failed", errMsg, isUserNotAllow);
 			btnStart.disabled = false;
 			btnStop.disabled = true;
@@ -559,6 +600,7 @@ function start() {
 	// 1 is ok, 0 is error
 	if(ret==1){
 		info_div.innerHTML="正在连接asr服务器，请等待...";
+		postKioskState("connecting");
 		isRec = true;
 		btnStart.disabled = true;
 		btnStop.disabled = true;
@@ -610,7 +652,8 @@ function stop() {
 	isRec = false;
 	speechDetected = false;
 	silenceSince = 0;
-    info_div.innerHTML="发送完数据,请等候,正在识别...";
+	info_div.innerHTML="发送完数据,请等候,正在识别...";
+	postKioskState("recognizing");
 
    if(isfilemode==false){
 	    btnStop.disabled = true;
@@ -703,4 +746,21 @@ function getUseITN() {
 		}
 	}
 	return false;
+}
+
+window.addEventListener("message", function(event) {
+	if (!kioskMode || event.origin !== window.location.origin || !event.data || event.data.source !== "tablet-ui") return;
+	if (event.data.action === "pause") {
+		kioskPaused = true;
+		if (typeof isRec !== "undefined" && isRec === true) stop();
+		postKioskState("paused");
+	} else if (event.data.action === "resume") {
+		kioskPaused = false;
+		if (kioskWaitingForAvatar) postKioskState("waiting");
+		else resumeRecording();
+	}
+});
+
+if (kioskMode) {
+	window.setTimeout(start, 0);
 }

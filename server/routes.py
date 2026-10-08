@@ -4,6 +4,8 @@
 
 import json
 import asyncio
+import os
+from threading import Thread
 from aiohttp import web
 
 from utils.logger import logger
@@ -62,9 +64,11 @@ async def human(request):
         elif params['type'] == 'chat':
             llm_response = request.app.get("llm_response")
             if llm_response:
-                asyncio.get_event_loop().run_in_executor(
+                avatar_session.begin_response()
+                future = asyncio.get_event_loop().run_in_executor(
                     None, llm_response, params['text'], avatar_session, datainfo
                 )
+                future.add_done_callback(lambda _: avatar_session.end_response())
 
         return json_ok()
     except Exception as e:
@@ -141,13 +145,13 @@ async def record(request):
 
 
 async def is_speaking(request):
-    """查询是否正在说话"""
+    """查询当前回复链路是否仍在生成、合成或播放。"""
     params = await request.json()
     sessionid = params.get('sessionid', '')
     avatar_session = get_session(request, sessionid)
     if avatar_session is None:
         return json_error("session not found")
-    return json_ok(data=avatar_session.is_speaking())
+    return json_ok(data=avatar_session.is_busy())
 
 async def sse_handler(request):
     """SSE 事件流，推送服务器状态更新到客户端"""
@@ -256,10 +260,12 @@ def setup_routes(app):
 
     # ── Local ASR endpoint (SenseVoice/FunASR) ── Issue #604 ──
     try:
-        from server.asr_server import asr_websocket_handler, is_funasr_available
+        from server.asr_server import asr_websocket_handler, is_funasr_available, preload_asr_model
         if is_funasr_available():
             app.router.add_get("/api/asr", asr_websocket_handler)
             logger.info("[ASR] Local SenseVoice ASR endpoint enabled at /api/asr")
+            if os.getenv("ASR_PRELOAD", "1") != "0":
+                Thread(target=preload_asr_model, name="asr-preload", daemon=True).start()
         else:
             logger.info("[ASR] funasr not installed — local ASR endpoint disabled "
                         "(pip install funasr modelscope)")

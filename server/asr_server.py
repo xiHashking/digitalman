@@ -60,6 +60,7 @@ def _load_sensevoice():
             vad_kwargs={"max_single_segment_time": 30000},
             device=device,
             trust_remote_code=True,
+            disable_update=True,
         )
         elapsed = time.perf_counter() - t0
         logger.info(
@@ -274,3 +275,11 @@ def is_funasr_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+def preload_asr_model():
+    """Warm the local ASR model during service startup instead of first speech."""
+    try:
+        _load_sensevoice()
+    except Exception as e:
+        logger.exception(f"[ASR] Background model preload failed: {e}")

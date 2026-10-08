@@ -30,7 +30,7 @@ import glob
 import resampy
 import queue
 from queue import Queue
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from io import BytesIO
 import soundfile as sf
 import asyncio
@@ -79,6 +79,8 @@ class BaseAvatar:
         self.custom_audio_index = {}
         self.custom_index = {}
         self.msgqueues = []
+        self._response_lock = Lock()
+        self._active_responses = 0
         # self.custom_opt = {}
         self.__loadcustom()
 
@@ -194,6 +196,20 @@ class BaseAvatar:
 
     def is_speaking(self) -> bool:
         return self.speaking
+
+    def begin_response(self):
+        with self._response_lock:
+            self._active_responses += 1
+
+    def end_response(self):
+        with self._response_lock:
+            self._active_responses = max(0, self._active_responses - 1)
+
+    def is_busy(self) -> bool:
+        with self._response_lock:
+            response_pending = self._active_responses > 0
+        tts_pending = hasattr(self, 'tts') and self.tts.is_busy()
+        return self.speaking or response_pending or tts_pending
     
     def __loadcustom(self):
         if not hasattr(self.opt, 'customopt') or not self.opt.customopt:
@@ -225,8 +241,14 @@ class BaseAvatar:
 
     def notify(self, eventpoint:dict):
         if eventpoint and eventpoint.get('status'):
-            logger.info("notify:%s", eventpoint)
-            self.send_msg(json.dumps(eventpoint))
+            if eventpoint.get('status') == 'end' and hasattr(self, 'tts'):
+                self.tts.mark_playback_end(eventpoint)
+            public_event = {
+                key: value for key, value in eventpoint.items()
+                if not key.startswith('_')
+            }
+            logger.info("notify:%s", public_event)
+            self.send_msg(json.dumps(public_event))
 
     def start_recording(self):
         if self.recording:
@@ -499,4 +521,3 @@ class BaseAvatar:
 
         process_quit_event.set()
         process_thread.join()
-
