@@ -559,7 +559,7 @@ function getConnState( connState ) {
 function record()
 	{
 			if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-				var secureMessage = "安卓平板需要通过 HTTPS 访问才能使用麦克风";
+				var secureMessage = "请先安装本机 CA 证书，再访问 https://" + window.location.hostname + ":8443/tablet.html";
 				info_div.innerHTML = secureMessage;
 				postKioskState("error", secureMessage);
 			console.error("[ASR] Microphone requires a secure context", window.location.href);

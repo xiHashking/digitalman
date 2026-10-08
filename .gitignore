@@ -18,6 +18,7 @@ workspace/log_ngp.txt
 .idea
 .venv/
 .env
+.certs/
 models/
 *.log
 dist

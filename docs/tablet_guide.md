@@ -10,7 +10,29 @@ https://你的域名/tablet.html
 
 ## 必须使用 HTTPS
 
-安卓 Chrome 不允许普通局域网 HTTP 页面调用麦克风。`http://电脑IP:8010/tablet.html` 可以看到画面，但无法进行语音对话。生产环境需要在 LiveTalking 前面配置 HTTPS 反向代理，例如 Caddy：
+安卓 Chrome 不允许普通局域网 HTTP 页面调用麦克风。`http://电脑IP:8010/tablet.html` 可以看到画面，但无法进行语音对话。
+
+本项目可以同时启动 HTTP `8010` 和 HTTPS `8443`。先生成局域网证书：
+
+```bash
+./scripts/create_local_https_cert.sh 192.168.10.46
+```
+
+重启服务后，在平板上先访问下面的 HTTP 地址下载 CA 证书，并在安卓的“安装证书 / CA 证书”设置中安装：
+
+```text
+http://192.168.10.46:8010/local-ca.crt
+```
+
+随后通过真正的 HTTPS 地址打开平板页面：
+
+```text
+https://192.168.10.46:8443/tablet.html
+```
+
+证书只适用于生成时指定的 IP。电脑 IP 变化后需要重新生成并在平板上重新安装。`.certs/` 包含私钥且已被 Git 忽略。
+
+公网生产环境仍建议在 LiveTalking 前面配置 HTTPS 反向代理，例如 Caddy：
 
 ```caddyfile
 avatar.example.com {

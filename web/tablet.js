@@ -189,8 +189,9 @@
 
     async function startExperience() {
         if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-            elements.startHint.textContent = '安卓平板需要通过 HTTPS 访问才能使用麦克风';
-            showToast('请先为服务配置 HTTPS', 6000);
+            const httpsUrl = 'https://' + window.location.hostname + ':8443/tablet.html';
+            elements.startHint.textContent = '先安装本机 CA 证书，再访问 ' + httpsUrl;
+            showToast('安卓 Chrome 需要可信 HTTPS 才能使用麦克风', 6000);
             return;
         }
         toggleFullscreen();

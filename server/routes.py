@@ -232,6 +232,18 @@ async def admin_sessions(request):
         return json_error(str(e))
 
 
+async def local_ca_certificate(request):
+    """Download the public local CA certificate used by the HTTPS listener."""
+    opt = request.app.get("opt")
+    cert_path = getattr(opt, 'ssl_ca_certfile', '') if opt else ''
+    if not cert_path or not os.path.isfile(cert_path):
+        raise web.HTTPNotFound(text='Local CA certificate is not configured')
+    return web.FileResponse(
+        cert_path,
+        headers={'Content-Disposition': 'attachment; filename="livetalking-local-ca.crt"'},
+    )
+
+
 # ─── 路由注册 ──────────────────────────────────────────────────────────────
 
 async def index(request):
@@ -256,6 +268,7 @@ def setup_routes(app):
     app.router.add_post("/is_speaking", is_speaking)
     app.router.add_get("/api/admin/config", admin_config)
     app.router.add_get("/api/admin/sessions", admin_sessions)
+    app.router.add_get("/local-ca.crt", local_ca_certificate)
     app.router.add_get('/sse', sse_handler)
 
     # ── Local ASR endpoint (SenseVoice/FunASR) ── Issue #604 ──

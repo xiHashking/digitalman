@@ -94,6 +94,14 @@ def parse_args():
     parser.add_argument('--max_session', type=int, default=5)
     parser.add_argument('--listenport', type=int, default=8010,
                         help="web listen port")
+    parser.add_argument('--https_port', type=int, default=0,
+                        help="HTTPS listen port; 0 disables the HTTPS listener")
+    parser.add_argument('--ssl_certfile', type=str, default='',
+                        help="TLS server certificate path")
+    parser.add_argument('--ssl_keyfile', type=str, default='',
+                        help="TLS server private key path")
+    parser.add_argument('--ssl_ca_certfile', type=str, default='',
+                        help="Local CA certificate exposed at /local-ca.crt")
 
     # ─── 虚拟摄像头 ───────────────────────────────────────────────────
     parser.add_argument('--audio_output_device', type=int, default=None,

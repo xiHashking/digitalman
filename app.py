@@ -53,6 +53,7 @@ from typing import Dict
 from utils.logger import logger
 import copy
 import gc
+import ssl
 from dotenv import load_dotenv
 
 
@@ -208,6 +209,26 @@ def main():
         loop.run_until_complete(runner.setup())
         site = web.TCPSite(runner, '0.0.0.0', opt.listenport)
         loop.run_until_complete(site.start())
+        https_port = getattr(opt, 'https_port', 0)
+        certfile = getattr(opt, 'ssl_certfile', '')
+        keyfile = getattr(opt, 'ssl_keyfile', '')
+        if https_port:
+            if not certfile or not keyfile or not os.path.isfile(certfile) or not os.path.isfile(keyfile):
+                logger.warning(
+                    'HTTPS disabled: certificate files are missing. '
+                    'Run scripts/create_local_https_cert.sh <LAN_IP>.'
+                )
+            else:
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                ssl_context.load_cert_chain(certfile, keyfile)
+                https_site = web.TCPSite(
+                    runner,
+                    '0.0.0.0',
+                    https_port,
+                    ssl_context=ssl_context,
+                )
+                loop.run_until_complete(https_site.start())
+                logger.info('start https server; https://<serverip>:%s', https_port)
         if opt.transport=='rtcpush':
             for k in range(opt.max_session):
                 push_url = opt.push_url
