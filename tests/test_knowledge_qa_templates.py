@@ -224,6 +224,38 @@ class KnowledgeQaTemplateTestCase(unittest.TestCase):
         self.assertEqual(result.matches[0].kind, "qa")
         self.assertEqual(result.matches[0].standard_question, "系统能否进行家校互动？")
 
+    def test_teacher_voice_recording_student_routes_to_student_product(self):
+        result = self.knowledge_base.search_with_scope_documents(
+            "老师对着平板说一句学生今天主动帮同学，系统接下来怎么处理？"
+        )
+
+        self.assertEqual(result.scope, _AI_LITERACY_QA_SCOPE)
+        self.assertTrue(result.documents)
+        self.assertTrue(
+            all(document.scope == _AI_LITERACY_QA_SCOPE for document in result.documents)
+        )
+
+    def test_teacher_evaluation_system_routes_to_teacher_product(self):
+        result = self.knowledge_base.search_with_scope_documents(
+            "教师评价系统需要培训多久？"
+        )
+
+        self.assertEqual(result.scope, _TEACHER_DEVELOPMENT_QA_SCOPE)
+
+    def test_ambiguous_followup_keeps_the_session_product_scope(self):
+        result = self.knowledge_base.search_with_scope_documents(
+            "那它还有哪些功能？",
+            preferred_scope=_TEACHER_DEVELOPMENT_QA_SCOPE,
+        )
+
+        self.assertEqual(result.scope, _TEACHER_DEVELOPMENT_QA_SCOPE)
+        self.assertTrue(
+            all(
+                document.scope == _TEACHER_DEVELOPMENT_QA_SCOPE
+                for document in result.documents
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

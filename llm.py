@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from avatars.base_avatar import BaseAvatar
 from utils.logger import logger
 from knowledge_base import search_knowledge
+from knowledge_qa_agent import answer_knowledge_question
 from tts.base_tts import sanitize_tts_text
 
 # Built-in LLM providers. Each exposes an OpenAI-compatible chat completions
@@ -187,6 +188,8 @@ def _needs_ai_literacy_policy(message, knowledge_result) -> bool:
     normalized_message = (message or "").lower().replace(" ", "")
     if any(term in normalized_message for term in _AI_LITERACY_SCOPE_TERMS):
         return True
+    if knowledge_result.scope == "AI素养评价产品QA":
+        return True
     return any(
         "AI素养评价" in match.title or "综合素养评价" in match.title
         for match in knowledge_result.matches
@@ -306,11 +309,13 @@ def _build_system_prompt(
     if uses_ai_literacy_policy:
         system_prompt += '\n\n' + AI_LITERACY_PRODUCT_POLICY
 
-    knowledge_context = (
-        ""
-        if suppress_knowledge_context
-        else knowledge_result.context(max_chars=max_context_chars)
-    )
+    knowledge_context = ""
+    if not suppress_knowledge_context:
+        knowledge_context = (
+            knowledge_result.scope_context(max_chars=max_context_chars)
+            if knowledge_result.documents
+            else knowledge_result.context(max_chars=max_context_chars)
+        )
     if knowledge_context:
         insufficient_evidence_rule = (
             '资料没有明确依据时，只能说“需要进一步确认”或“可以由团队评估”。'
@@ -341,32 +346,75 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
             _speak_answer(guarded_answer, avatar_session, datainfo)
             return
 
-        knowledge_result = search_knowledge(message)
+        knowledge_result = search_knowledge(
+            message,
+            preferred_scope=getattr(avatar_session, 'knowledge_scope', ''),
+        )
+        if knowledge_result.scope:
+            try:
+                avatar_session.knowledge_scope = knowledge_result.scope
+            except (AttributeError, TypeError):
+                pass
         policy_guard = _requires_ai_literacy_policy_reasoning(
             message,
             knowledge_result,
         )
-        if (
-            knowledge_result.matches
-            and knowledge_result.matches[0].kind == 'qa'
-            and not policy_guard
-        ):
-            match = knowledge_result.matches[0]
-            answer = sanitize_tts_text(match.standard_answer)
-            logger.info(
-                "[KB][QA] template answer selected in %.3fs source=%s question=%r",
-                time.perf_counter() - start,
-                match.title,
-                match.standard_question,
-            )
-            _speak_answer(answer, avatar_session, datainfo)
-            return
-
         opt = avatar_session.opt
         client = _llm_client(opt)
         model = _llm_model(opt)
         end = time.perf_counter()
-        logger.info(f"llm Time init: {end-start}s,{message}")
+        logger.info(
+            "llm Time init: %.3fs model=%s query=%s",
+            end - start,
+            model,
+            message,
+        )
+        knowledge_agent_enabled = os.getenv(
+            'KB_KNOWLEDGE_AGENT_ENABLED',
+            '1',
+        ).strip().lower() not in {'0', 'false', 'no', 'off'}
+        if knowledge_agent_enabled and knowledge_result.documents:
+            try:
+                knowledge_answer = answer_knowledge_question(
+                    client,
+                    model=model,
+                    question=message,
+                    result=knowledge_result,
+                    policy_text=(
+                        AI_LITERACY_PRODUCT_POLICY
+                        if _needs_ai_literacy_policy(message, knowledge_result)
+                        else ""
+                    ),
+                )
+                logger.info(
+                    "[KB][AGENT] answer ready in %.3fs scope=%s docs=%d "
+                    "evidence=%d gaps=%d",
+                    time.perf_counter() - start,
+                    knowledge_result.scope,
+                    len(knowledge_result.documents),
+                    len(knowledge_answer.evidence),
+                    len(knowledge_answer.gaps),
+                )
+                _speak_answer(knowledge_answer.answer, avatar_session, datainfo)
+                return
+            except Exception as exc:
+                logger.warning(
+                    "[KB][AGENT] request or validation failed, using fallback: %s",
+                    exc,
+                )
+                if (
+                    knowledge_result.matches
+                    and knowledge_result.matches[0].kind == 'qa'
+                    and not policy_guard
+                ):
+                    match = knowledge_result.matches[0]
+                    logger.info(
+                        "[KB][QA] validated-agent fallback source=%s question=%r",
+                        match.title,
+                        match.standard_question,
+                    )
+                    _speak_answer(match.standard_answer, avatar_session, datainfo)
+                    return
         try:
             max_context_chars = max(
                 1000,

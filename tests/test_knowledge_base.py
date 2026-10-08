@@ -63,6 +63,19 @@ class KnowledgeBaseTestCase(unittest.TestCase):
         self.assertEqual(result.matches, ())
         self.assertEqual(result.skipped_reason, "ambiguous_scope")
 
+    def test_scope_bundle_contains_only_the_selected_product_documents(self):
+        result = self.knowledge_base.search_with_scope_documents(
+            "AI招生系统能提供哪些就业指导？"
+        )
+
+        self.assertEqual(result.scope, "AI宣传招生就业系统常见QA")
+        self.assertEqual(
+            [document.title for document in result.documents],
+            ["AI招生系统介绍"],
+        )
+        self.assertIn("就业指导", result.scope_context())
+        self.assertNotIn("职称评审", result.scope_context())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from knowledge_base import KnowledgeMatch, KnowledgeSearchResult
+from knowledge_base import KnowledgeDocument, KnowledgeMatch, KnowledgeSearchResult
+from knowledge_qa_agent import KnowledgeQaAnswer, KnowledgeQaEvidence
 from llm import (
     AI_LITERACY_PRODUCT_POLICY,
     SpeechSegmenter,
@@ -212,7 +213,7 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         self.assertTrue(segments)
         self.assertLessEqual(len(segments[0]), 20)
 
-    def test_qa_template_bypasses_llm_and_removes_markdown_for_speech(self):
+    def test_qa_template_is_grounding_for_knowledge_agent(self):
         avatar = SimpleNamespace(
             opt=SimpleNamespace(),
             put_msg_txt=lambda text, data: spoken.append(text),
@@ -232,15 +233,33 @@ class SpeechSegmenterTestCase(unittest.TestCase):
                     standard_answer="**可以**。\n- 第一项\n- 第二项",
                 ),
             ),
+            scope="AI素养评价产品QA",
+            documents=(
+                KnowledgeDocument(
+                    scope="AI素养评价产品QA",
+                    title="标准问答",
+                    text="**可以**。\n- 第一项\n- 第二项",
+                ),
+            ),
+        )
+        grounded_answer = KnowledgeQaAnswer(
+            answer="**可以**。第一项和第二项都支持。",
+            evidence=(KnowledgeQaEvidence("标准问答", "可以"),),
+            gaps=(),
         )
 
         with (
             patch("llm.search_knowledge", return_value=result),
             patch("llm._llm_client") as client_factory,
+            patch(
+                "llm.answer_knowledge_question",
+                return_value=grounded_answer,
+            ) as knowledge_agent,
         ):
             llm_response("测试", avatar)
 
-        client_factory.assert_not_called()
+        client_factory.assert_called_once()
+        knowledge_agent.assert_called_once()
         speech = "".join(spoken)
         self.assertNotIn("*", speech)
         self.assertIn("可以", speech)

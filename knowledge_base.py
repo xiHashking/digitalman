@@ -8,7 +8,7 @@ import re
 import threading
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from utils.logger import logger
@@ -26,6 +26,13 @@ _PRIORITY_QA_SCOPES = {
 _AI_LITERACY_QA_SCOPE = "AI素养评价产品QA"
 _TEACHER_DEVELOPMENT_QA_SCOPE = "教师发展评价系统常见场景QA"
 _ADMISSIONS_EMPLOYMENT_QA_SCOPE = "AI宣传招生就业系统常见QA"
+_DOMAIN_QUERY_RE = re.compile(
+    r"AI|素养|评价|学生|孩子|教师|老师|学校|家长|考生|招生|就业|"
+    r"系统|产品|五育|德育|体育|美育|劳育|成长|档案|报告|教研|"
+    r"劳动|运动会|家务|奖状|体质|职称|简历|岗位|招聘|面试|一体机|"
+    r"宣传屏|开放日|专业介绍|数字人",
+    re.IGNORECASE,
+)
 _QA_QUESTION_RE = re.compile(
     r"^\s*(?:#{2,4}\s*)?(?:【[^】]+】\s*)?Q(?:\d+)?[：:]\s*(.+?)\s*$",
     re.IGNORECASE,
@@ -286,6 +293,14 @@ _QA_SCOPE_CUES = {
         (re.compile(r"五育|德智体美劳|成长银行|校本指标|评价标准"), 4),
         (
             re.compile(
+                r"(老师|教师).{0,12}(说一句|说话|口述|语音|平板).{0,12}"
+                r"(学生|孩子)|"
+                r"(学生|孩子).{0,12}(表现|行为|成长).{0,12}(记录|评价|录入)"
+            ),
+            5,
+        ),
+        (
+            re.compile(
                 r"学生表现|学生.{0,6}(成长|评价|档案|报告)|"
                 r"孩子.{0,8}(成长|评价|档案|报告)|"
                 r"评价.{0,4}学生|考核学生|考试成绩|课堂表现|"
@@ -296,7 +311,7 @@ _QA_SCOPE_CUES = {
         (
             re.compile(
                 r"小学|初中|高中|中小学|教务系统|德育系统|学生报告|"
-                r"家务劳动|奖状|体质测试|班级试点|年级试点|"
+                r"家务劳动|做家务|运动会|奖状|体质测试|班级试点|年级试点|"
                 r"几个班.{0,5}(先试|试点|试用)|先试.{0,5}几个班|"
                 r"[一二三四五六七八九十两0-9]+个班.{0,5}(试试|先试|试点|试用)|"
                 r"主观偏差|客观公正|评价.{0,4}凭印象"
@@ -317,7 +332,7 @@ _QA_SCOPE_CUES = {
         ),
     ),
     _TEACHER_DEVELOPMENT_QA_SCOPE: (
-        (re.compile(r"教师发展评价|教师发展系统"), 6),
+        (re.compile(r"教师发展评价|教师发展系统|教师评价系统|老师评价系统"), 6),
         (
             re.compile(
                 r"教师队伍|教师成长|教师档案|教师个人|老师个人|"
@@ -328,7 +343,7 @@ _QA_SCOPE_CUES = {
         (
             re.compile(
                 r"评优评先|评职称|职称推荐|青年教师|教研组|"
-                r"校本研修|一核三库五应用|骨干教师|骨干梯队|"
+                r"青年老师|校本研修|一核三库五应用|骨干教师|骨干梯队|"
                 r"教师画像|发展画像|师资队伍|人事系统|人事平台"
             ),
             4,
@@ -341,7 +356,8 @@ _QA_SCOPE_CUES = {
             re.compile(
                 r"招生|就业|考生|专业选择|职业规划|简历|岗位|招聘|"
                 r"面试|开放日|宣传屏|一体机|三方协议|档案转接|求职|"
-                r"招生政策|校园导览|意向登记|智慧校园"
+                r"招生政策|校园导览|意向登记|智慧校园|专业介绍|"
+                r"数字人.{0,8}(资料|内容|回答|更新)|资料.{0,8}数字人"
             ),
             4,
         ),
@@ -478,6 +494,8 @@ class KnowledgeSearchResult:
     query: str
     matches: tuple[KnowledgeMatch, ...]
     skipped_reason: str = ""
+    scope: str = ""
+    documents: tuple["KnowledgeDocument", ...] = ()
 
     def context(self, max_chars: int = _DEFAULT_CONTEXT_CHARS) -> str:
         blocks: list[str] = []
@@ -501,6 +519,29 @@ class KnowledgeSearchResult:
             blocks.append(block)
             used += len(block)
         return "\n\n".join(blocks)
+
+    def scope_context(self, max_chars: int = 50000) -> str:
+        """Return stable, full-document context for the selected product scope."""
+        blocks: list[str] = []
+        used = 0
+        for index, document in enumerate(self.documents, start=1):
+            block = (
+                f"[文档 {index}]\n"
+                f"文档路径：{document.title}\n"
+                f"原文：\n{document.text}"
+            )
+            if used + len(block) > max_chars:
+                break
+            blocks.append(block)
+            used += len(block)
+        return "\n\n".join(blocks)
+
+
+@dataclass(frozen=True)
+class KnowledgeDocument:
+    scope: str
+    title: str
+    text: str
 
 
 @dataclass(frozen=True)
@@ -639,8 +680,20 @@ class KnowledgeBase:
         self.scope_frequency: dict[str, int] = {}
         self.qa_entries: list[_QaEntry] = []
         self.qa_document_frequency: dict[str, int] = {}
+        self.documents: list[KnowledgeDocument] = []
         self._load()
         self.semantic_qa_index = _LocalSemanticQaIndex(self.qa_entries)
+
+    @staticmethod
+    def _canonical_scope(title: str) -> str:
+        source_scope = title.split("/", 1)[0]
+        if "宣传招生就业" in source_scope or "招生系统" in source_scope:
+            return _ADMISSIONS_EMPLOYMENT_QA_SCOPE
+        if "教师发展评价" in source_scope:
+            return _TEACHER_DEVELOPMENT_QA_SCOPE
+        if "AI素养评价" in source_scope or "学生综合素质评价" in source_scope:
+            return _AI_LITERACY_QA_SCOPE
+        return source_scope
 
     def _load(self) -> None:
         if not self.root.is_dir():
@@ -660,10 +713,12 @@ class KnowledgeBase:
             if not text:
                 continue
             title = str(path.relative_to(self.root).with_suffix(""))
-            scope = title.split("/", 1)[0]
+            source_scope = title.split("/", 1)[0]
+            scope = self._canonical_scope(title)
+            self.documents.append(KnowledgeDocument(scope, title, text))
             title_terms = frozenset(_terms(title))
             self.scope_terms.setdefault(scope, frozenset(_terms(scope)))
-            if scope in _PRIORITY_QA_SCOPES:
+            if source_scope in _PRIORITY_QA_SCOPES:
                 self.qa_entries.extend(self._parse_qa_entries(scope, title, text))
             for chunk_text in _split_chunks(text):
                 term_counts = _terms(chunk_text)
@@ -790,6 +845,105 @@ class KnowledgeBase:
 
     def warm(self) -> None:
         self.semantic_qa_index.warm()
+
+    @staticmethod
+    def _configured_default_scope() -> str:
+        configured = os.getenv(
+            "KB_DEFAULT_SCOPE",
+            _AI_LITERACY_QA_SCOPE,
+        ).strip()
+        aliases = {
+            "ai素养评价": _AI_LITERACY_QA_SCOPE,
+            "学生综合素质评价": _AI_LITERACY_QA_SCOPE,
+            "教师发展评价": _TEACHER_DEVELOPMENT_QA_SCOPE,
+            "宣传招生就业": _ADMISSIONS_EMPLOYMENT_QA_SCOPE,
+            "招生就业": _ADMISSIONS_EMPLOYMENT_QA_SCOPE,
+        }
+        return aliases.get(configured.lower(), configured)
+
+    def _resolve_scope(
+        self,
+        query: str,
+        result: KnowledgeSearchResult,
+        preferred_scope: str = "",
+    ) -> str:
+        direct_intent = _priority_qa_intent(query)
+        if direct_intent is not None:
+            return direct_intent[0]
+
+        explicit_scopes = _priority_qa_scopes(query)
+        if len(explicit_scopes) == 1:
+            return next(iter(explicit_scopes))
+
+        if (
+            preferred_scope in _PRIORITY_QA_SCOPES
+            and any(doc.scope == preferred_scope for doc in self.documents)
+        ):
+            return preferred_scope
+
+        if result.matches:
+            best_match = result.matches[0]
+            matched_scope = self._canonical_scope(best_match.title)
+            reliable_match = (
+                best_match.kind == "qa"
+                and (
+                    best_match.score >= 45.0
+                    or best_match.semantic_score >= 0.60
+                    or "intent" in best_match.matched_terms
+                )
+            )
+            if reliable_match and matched_scope in _PRIORITY_QA_SCOPES:
+                return matched_scope
+
+        inferred_scopes = self._select_scopes(set(_terms(query, query=True)))
+        product_scopes = inferred_scopes & _PRIORITY_QA_SCOPES
+        if len(product_scopes) == 1:
+            return next(iter(product_scopes))
+
+        if _DOMAIN_QUERY_RE.search(query or ""):
+            default_scope = self._configured_default_scope()
+            if any(doc.scope == default_scope for doc in self.documents):
+                return default_scope
+
+        if result.matches:
+            matched_scope = self._canonical_scope(result.matches[0].title)
+            if matched_scope in _PRIORITY_QA_SCOPES:
+                return matched_scope
+        return ""
+
+    def search_with_scope_documents(
+        self,
+        query: str,
+        top_k: int = 4,
+        preferred_scope: str = "",
+    ) -> KnowledgeSearchResult:
+        """Search and attach every document in the selected product scope."""
+        result = self.search(query, top_k=top_k)
+        if result.skipped_reason in {"empty_query", "casual_conversation", "knowledge_base_feedback"}:
+            return result
+
+        scope = self._resolve_scope(query, result, preferred_scope=preferred_scope)
+        if not scope:
+            return result
+
+        scoped_documents = [doc for doc in self.documents if doc.scope == scope]
+        scoped_documents.sort(
+            key=lambda doc: (
+                0 if doc.title.split("/", 1)[0] == scope else 1,
+                doc.title,
+            )
+        )
+        scoped_matches = tuple(
+            match
+            for match in result.matches
+            if self._canonical_scope(match.title) == scope
+        )
+        return replace(
+            result,
+            matches=scoped_matches,
+            scope=scope,
+            documents=tuple(scoped_documents),
+        )
 
     def _search_priority_qa(
         self,
@@ -1171,7 +1325,7 @@ _kb: KnowledgeBase | None = None
 _kb_lock = threading.Lock()
 
 
-def search_knowledge(query: str) -> KnowledgeSearchResult:
+def search_knowledge(query: str, preferred_scope: str = "") -> KnowledgeSearchResult:
     """Search the configured local knowledge base and log auditable hits."""
     global _kb
     start = time.perf_counter()
@@ -1194,7 +1348,11 @@ def search_knowledge(query: str) -> KnowledgeSearchResult:
         top_k = max(1, int(os.getenv("KB_TOP_K", "4")))
     except ValueError:
         top_k = 4
-    result = knowledge_base.search(query, top_k=top_k)
+    result = knowledge_base.search_with_scope_documents(
+        query,
+        top_k=top_k,
+        preferred_scope=preferred_scope,
+    )
     elapsed_ms = (time.perf_counter() - start) * 1000
     if result.matches:
         hit_summary = "; ".join(
@@ -1204,13 +1362,15 @@ def search_knowledge(query: str) -> KnowledgeSearchResult:
             for match in result.matches
         )
         logger.info(
-            "[KB] query=%r hits=%d elapsed_ms=%.1f | %s",
-            query, len(result.matches), elapsed_ms, hit_summary,
+            "[KB] query=%r scope=%r docs=%d hits=%d elapsed_ms=%.1f | %s",
+            query, result.scope, len(result.documents), len(result.matches), elapsed_ms,
+            hit_summary,
         )
     else:
         logger.info(
-            "[KB] query=%r no_hit reason=%s elapsed_ms=%.1f",
-            query, result.skipped_reason or "below_threshold", elapsed_ms,
+            "[KB] query=%r scope=%r docs=%d no_hit reason=%s elapsed_ms=%.1f",
+            query, result.scope, len(result.documents),
+            result.skipped_reason or "below_threshold", elapsed_ms,
         )
     return result
 
