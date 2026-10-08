@@ -38,6 +38,7 @@ from aiortc.rtcrtpsender import RTCRtpSender
 from server.webrtc import HumanPlayer
 from avatars.base_avatar import BaseAvatar
 from llm import llm_response
+from knowledge_base import warm_knowledge_base
 import registry
 from server.routes import setup_routes
 from server.rtc_manager import RTCManager
@@ -252,6 +253,7 @@ def main():
 if __name__ == '__main__':
     mp.set_start_method('spawn')
     load_dotenv()  # Load environment variables from .env file, if it exists
+    warm_knowledge_base()
     main()
     
     

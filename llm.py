@@ -5,6 +5,7 @@ if TYPE_CHECKING:
     from avatars.base_avatar import BaseAvatar
 from utils.logger import logger
 from knowledge_base import search_knowledge
+from tts.base_tts import sanitize_tts_text
 
 # Built-in LLM providers. Each exposes an OpenAI-compatible chat completions
 # endpoint; the active one is selected with --llm_provider (default: dashscope).
@@ -95,13 +96,30 @@ def _llm_model(opt) -> str:
 
 def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
     try:
-        opt = avatar_session.opt
         start = time.perf_counter()
+        knowledge_result = search_knowledge(message)
+        if knowledge_result.matches and knowledge_result.matches[0].kind == 'qa':
+            match = knowledge_result.matches[0]
+            answer = sanitize_tts_text(match.standard_answer)
+            logger.info(
+                "[KB][QA] template answer selected in %.3fs source=%s question=%r",
+                time.perf_counter() - start,
+                match.title,
+                match.standard_question,
+            )
+            segmenter = SpeechSegmenter()
+            for segment in segmenter.feed(answer):
+                avatar_session.put_msg_txt(segment, datainfo)
+            final_segment = segmenter.flush()
+            if final_segment:
+                avatar_session.put_msg_txt(final_segment, datainfo)
+            return
+
+        opt = avatar_session.opt
         client = _llm_client(opt)
         model = _llm_model(opt)
         end = time.perf_counter()
         logger.info(f"llm Time init: {end-start}s,{message}")
-        knowledge_result = search_knowledge(message)
         try:
             max_context_chars = max(
                 1000,

@@ -1,6 +1,9 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from llm import SpeechSegmenter
+from knowledge_base import KnowledgeMatch, KnowledgeSearchResult
+from llm import SpeechSegmenter, llm_response
 
 
 class SpeechSegmenterTestCase(unittest.TestCase):
@@ -23,6 +26,41 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         segments = segmenter.feed('这是一段一直没有任何标点并且会持续很长时间的模型输出内容')
         self.assertTrue(segments)
         self.assertLessEqual(len(segments[0]), 20)
+
+    def test_qa_template_bypasses_llm_and_removes_markdown_for_speech(self):
+        avatar = SimpleNamespace(
+            opt=SimpleNamespace(),
+            put_msg_txt=lambda text, data: spoken.append(text),
+        )
+        spoken = []
+        result = KnowledgeSearchResult(
+            query="测试",
+            matches=(
+                KnowledgeMatch(
+                    title="标准问答",
+                    text="**可以**。\n- 第一项\n- 第二项",
+                    score=100,
+                    coverage=1,
+                    matched_terms=("测试",),
+                    kind="qa",
+                    standard_question="可以吗？",
+                    standard_answer="**可以**。\n- 第一项\n- 第二项",
+                ),
+            ),
+        )
+
+        with (
+            patch("llm.search_knowledge", return_value=result),
+            patch("llm._llm_client") as client_factory,
+        ):
+            llm_response("测试", avatar)
+
+        client_factory.assert_not_called()
+        speech = "".join(spoken)
+        self.assertNotIn("*", speech)
+        self.assertIn("可以", speech)
+        self.assertIn("第一项", speech)
+        self.assertIn("第二项", speech)
 
 
 if __name__ == '__main__':

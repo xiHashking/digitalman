@@ -102,7 +102,9 @@ python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1
 KNOWLEDGE_BASE_DIR=/path/to/knowledge-base python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1
 ```
 
-知识库只会向模型注入达到相关度门槛的资料，寒暄和无关问题会跳过检索。每轮检索会在日志中记录命中文档、分数、覆盖率和关键词。可通过 `KB_TOP_K`（默认 `4`）、`KB_MIN_SCORE`（默认 `6.0`）、`KB_MIN_COVERAGE`（默认 `0.16`）和 `KB_MAX_CONTEXT_CHARS`（默认 `6000`）调整召回范围。
+知识库只会向模型注入达到相关度门槛的资料，寒暄和无关问题会跳过检索。名为 `AI素养评价产品QA`、`教师发展评价系统常见场景QA` 和 `AI宣传招生就业系统常见QA` 的目录会按标准问答优先处理：词法匹配明确时直接返回模板答案，换一种说法时由本地中文语义模型补充召回。首次启动会下载约 100 MB 的 `BAAI/bge-small-zh-v1.5`，之后离线使用并在服务启动时预热。
+
+每轮检索会在日志中记录命中文档、分数、覆盖率和关键词。常规资料可通过 `KB_TOP_K`（默认 `4`）、`KB_MIN_SCORE`（默认 `6.0`）、`KB_MIN_COVERAGE`（默认 `0.16`）和 `KB_MAX_CONTEXT_CHARS`（默认 `6000`）调整；标准 QA 可通过 `KB_QA_MIN_RELEVANCE`（默认 `0.07`）、`KB_QA_SEMANTIC_THRESHOLD`（默认 `0.52`）调整。设置 `KB_QA_SEMANTIC_ENABLED=0` 可关闭语义召回，设置 `KB_QA_EMBEDDING_LOCAL_ONLY=1` 可禁止自动下载模型。
 
 
 >  **注意**: 服务端需开放端口 TCP:8010, UDP:1-65536  
