@@ -8,6 +8,7 @@ from llm import (
     SpeechSegmenter,
     _build_system_prompt,
     _direct_guard_answer,
+    _llm_model,
     _normalize_asr_query,
     _requires_ai_literacy_policy_reasoning,
     llm_response,
@@ -15,6 +16,12 @@ from llm import (
 
 
 class SpeechSegmenterTestCase(unittest.TestCase):
+    def test_environment_model_overrides_configured_default(self):
+        opt = SimpleNamespace(llm_provider="dashscope", llm_model="qwen-turbo")
+
+        with patch.dict("os.environ", {"LLM_MODEL": "deepseek-v4-flash"}):
+            self.assertEqual(_llm_model(opt), "deepseek-v4-flash")
+
     def test_ai_literacy_policy_is_injected_for_matching_product(self):
         result = KnowledgeSearchResult(
             query="AI素养评价是什么？",

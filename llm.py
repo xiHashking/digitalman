@@ -180,7 +180,7 @@ def _llm_client(opt):
 def _llm_model(opt) -> str:
     """Resolve the model name, falling back to the provider default."""
     cfg = LLM_PROVIDERS.get(_llm_provider(opt), LLM_PROVIDERS['dashscope'])
-    return getattr(opt, 'llm_model', '') or os.getenv('LLM_MODEL') or cfg['default_model']
+    return os.getenv('LLM_MODEL') or getattr(opt, 'llm_model', '') or cfg['default_model']
 
 
 def _needs_ai_literacy_policy(message, knowledge_result) -> bool:
@@ -385,14 +385,27 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
             max_tokens = int(os.getenv('LLM_MAX_TOKENS', '128'))
         except ValueError:
             max_tokens = 128
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[{'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': message}],
-            stream=True,
-            max_tokens=max_tokens,
+        completion_options = {
+            "model": model,
+            "messages": [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': message},
+            ],
+            "stream": True,
+            "max_tokens": max_tokens,
             # Display token usage in the last line of the streamed response.
-            stream_options={"include_usage": True}
+            "stream_options": {"include_usage": True},
+        }
+        if os.getenv('LLM_DISABLE_REASONING', '').lower() in {
+            '1', 'true', 'yes', 'on'
+        }:
+            # OpenAI-compatible reasoning gateways commonly accept this body
+            # extension. Keeping it opt-in preserves compatibility elsewhere.
+            completion_options["extra_body"] = {
+                "thinking": {"type": "disabled"}
+            }
+        completion = client.chat.completions.create(
+            **completion_options
         )
         segmenter = SpeechSegmenter()
         first = True
