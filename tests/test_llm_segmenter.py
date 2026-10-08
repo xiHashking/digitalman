@@ -7,6 +7,8 @@ from llm import (
     AI_LITERACY_PRODUCT_POLICY,
     SpeechSegmenter,
     _build_system_prompt,
+    _direct_guard_answer,
+    _normalize_asr_query,
     _requires_ai_literacy_policy_reasoning,
     llm_response,
 )
@@ -62,11 +64,24 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         self.assertTrue(
             _requires_ai_literacy_policy_reasoning("能完全替代老师录入吗？", ai_result)
         )
+        for question in (
+            "AI自己给学生打分并发布可以吗？",
+            "AI能判断学生是不是故意的吗？",
+            "能根据一个分数判断哪个学生更优秀吗？",
+            "完全不需要老师录入和确认吗？",
+            "可以不经过老师审核直接给家长看吗？",
+            "学校管理决定可以交给AI吗？",
+            "这个系统是不是专门考孩子的？",
+        ):
+            self.assertTrue(
+                _requires_ai_literacy_policy_reasoning(question, ai_result),
+                question,
+            )
         self.assertTrue(
             _requires_ai_literacy_policy_reasoning("能保证一个月上线吗？", ai_result)
         )
 
-    def test_policy_guard_prevents_wrong_qa_from_bypassing_llm(self):
+    def test_policy_guard_prevents_wrong_qa_and_llm_from_answering(self):
         result = KnowledgeSearchResult(
             query="AI可以自动给学生打分吗？",
             matches=(
@@ -83,12 +98,11 @@ class SpeechSegmenterTestCase(unittest.TestCase):
             ),
         )
         create = Mock(return_value=[])
-        client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=create)),
-        )
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+        spoken = []
         avatar = SimpleNamespace(
             opt=SimpleNamespace(),
-            put_msg_txt=Mock(),
+            put_msg_txt=lambda text, data: spoken.append(text),
         )
 
         with (
@@ -98,9 +112,42 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         ):
             llm_response("AI可以自动给学生打分吗？", avatar)
 
-        system_prompt = create.call_args.kwargs["messages"][0]["content"]
-        self.assertIn(AI_LITERACY_PRODUCT_POLICY, system_prompt)
-        self.assertNotIn("错误候选答案", system_prompt)
+        create.assert_not_called()
+        self.assertNotIn("错误候选答案", "".join(spoken))
+        self.assertIn("不能", "".join(spoken))
+
+    def test_company_unknown_facts_are_answered_without_search_or_llm(self):
+        spoken = []
+        avatar = SimpleNamespace(
+            opt=SimpleNamespace(),
+            put_msg_txt=lambda text, data: spoken.append(text),
+        )
+
+        with (
+            patch("llm.search_knowledge") as search,
+            patch("llm._llm_client") as client_factory,
+        ):
+            llm_response("目前已经服务了多少学生？", avatar)
+
+        search.assert_not_called()
+        client_factory.assert_not_called()
+        self.assertIn("需要进一步确认", "".join(spoken))
+
+    def test_incoherent_asr_is_not_repeated(self):
+        self.assertEqual(
+            _direct_guard_answer("你看在小红书上实页个分是这个呀"),
+            "抱歉，我没听清，请再说一遍。",
+        )
+        self.assertEqual(
+            _direct_guard_answer("的话的问题"),
+            "抱歉，我没听清，请再说一遍。",
+        )
+
+    def test_common_asr_product_name_is_normalized(self):
+        self.assertEqual(
+            _normalize_asr_query("介绍一下什么是二零四用评价"),
+            "介绍一下什么是AI素养评价",
+        )
 
     def test_emits_first_complete_sentence_while_stream_is_open(self):
         segmenter = SpeechSegmenter()

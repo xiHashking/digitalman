@@ -23,6 +23,9 @@ _PRIORITY_QA_SCOPES = {
     "教师发展评价系统常见场景QA",
     "AI宣传招生就业系统常见QA",
 }
+_AI_LITERACY_QA_SCOPE = "AI素养评价产品QA"
+_TEACHER_DEVELOPMENT_QA_SCOPE = "教师发展评价系统常见场景QA"
+_ADMISSIONS_EMPLOYMENT_QA_SCOPE = "AI宣传招生就业系统常见QA"
 _QA_QUESTION_RE = re.compile(
     r"^\s*(?:#{2,4}\s*)?(?:【[^】]+】\s*)?Q(?:\d+)?[：:]\s*(.+?)\s*$",
     re.IGNORECASE,
@@ -54,13 +57,108 @@ _QA_ROLE_TERMS = {
     "教研", "教务", "招生", "就业", "班主任", "信息化",
 }
 _QA_QUERY_EXPANSIONS = (
+    (
+        re.compile(r"什么是\s*AI\s*素养评价|AI\s*素养评价.{0,6}(什么|干嘛|作用)", re.I),
+        "这个系统主要是做什么 学生综合素质评价",
+    ),
     (re.compile(r"孩子|小孩"), "学生"),
     (re.compile(r"闲置|吃灰|没什么用"), "摆设 招生季"),
     (re.compile(r"乱说|说错|答错"), "回答不准确"),
     (re.compile(r"求职材料"), "简历"),
     (re.compile(r"小范围.{0,4}(试|用)"), "试点"),
     (re.compile(r"忙不过来|接待不过来"), "人流量大 现场人很多"),
+    (
+        re.compile(
+            r"考试成绩|哪些方面.{0,4}(表现|成长)|记录.{0,6}表现|"
+            r"体育.{0,8}(劳动|实践)|劳动.{0,8}(体育|实践)"
+        ),
+        "五个维度 德智体美劳 评价采集内容",
+    ),
+    (
+        re.compile(r"语音.{0,8}(评价|记录|录入)|评价记录"),
+        "AI自动采集数据 老师手动输入",
+    ),
+    (
+        re.compile(r"评价标准.{0,10}(不同|适配|学校)|不同学校.{0,8}评价"),
+        "系统适用学校 自定义评价指标 适配学校办学特色",
+    ),
+    (
+        re.compile(r"(孩子|学生).{0,10}(学期|成长).{0,8}报告"),
+        "评价结果 学期成长报告",
+    ),
+    (
+        re.compile(
+            r"老师.{0,12}记录.{0,12}学生.{0,12}(负担|工作量|更累)|"
+            r"记录.{0,12}学生.{0,12}(负担|工作量|更累)"
+        ),
+        "AI素养评价 教师记录 减负效果",
+    ),
+    (
+        re.compile(r"(学生评价|学生成长|学生综合).{0,8}(上线|部署).{0,6}(麻烦|多久|时间)"),
+        "从部署到上线需要多长时间",
+    ),
+    (
+        re.compile(r"(老师|教师).{0,8}(成长报告|个人报告)"),
+        "系统能生成教师个人成长报告",
+    ),
+    (
+        re.compile(r"(给|对).{0,4}(老师|教师).{0,6}(排名|考核|优劣)"),
+        "系统是不是用来考核老师",
+    ),
 )
+
+_QA_SCOPE_CUES = {
+    _AI_LITERACY_QA_SCOPE: (
+        (re.compile(r"AI\s*素养评价|素养评价|综合素养评价|综合素质评价", re.I), 6),
+        (re.compile(r"五育|德智体美劳|成长银行|校本指标|评价标准"), 4),
+        (
+            re.compile(
+                r"学生表现|学生.{0,6}(成长|评价|档案|报告)|"
+                r"孩子.{0,8}(成长|评价|档案|报告)|"
+                r"评价.{0,4}学生|考核学生|考试成绩|课堂表现|"
+                r"体育比赛|劳动教育|社会实践|成长档案"
+            ),
+            3,
+        ),
+        (
+            re.compile(
+                r"评价记录|家校互动|家校协同|"
+                r"家长.{0,6}(孩子|成长档案)|"
+                r"语音.{0,8}(记录|评价)|"
+                r"老师.{0,10}(记录|录入).{0,10}(学生|表现|评价)"
+            ),
+            2,
+        ),
+    ),
+    _TEACHER_DEVELOPMENT_QA_SCOPE: (
+        (re.compile(r"教师发展评价|教师发展系统"), 6),
+        (
+            re.compile(
+                r"教师队伍|教师成长|教师档案|教师个人|老师个人|"
+                r"评价老师|考核老师|老师.{0,6}(考核|评价依据|排名|优劣)"
+            ),
+            4,
+        ),
+        (
+            re.compile(
+                r"评优评先|评职称|职称推荐|青年教师|教研组|"
+                r"校本研修|一核三库五应用"
+            ),
+            4,
+        ),
+        (re.compile(r"老师使用系统.{0,8}(工作量|负担)"), 2),
+    ),
+    _ADMISSIONS_EMPLOYMENT_QA_SCOPE: (
+        (re.compile(r"宣传招生|招生就业|AI\s*招生就业", re.I), 6),
+        (
+            re.compile(
+                r"招生|就业|考生|专业选择|职业规划|简历|岗位|招聘|"
+                r"面试|开放日|宣传屏|一体机|三方协议|档案转接|求职"
+            ),
+            4,
+        ),
+    ),
+}
 
 
 def _normalize_text(text: str) -> str:
@@ -73,6 +171,23 @@ def _qa_query_terms(query: str) -> Counter[str]:
         if pattern.search(query or ""):
             counts.update(_terms(expansion, query=True))
     return counts
+
+
+def _priority_qa_scopes(query: str) -> set[str]:
+    """Return strongly implied product scopes for priority QA matching."""
+    scores: dict[str, int] = {}
+    for scope, cues in _QA_SCOPE_CUES.items():
+        score = sum(weight for pattern, weight in cues if pattern.search(query or ""))
+        if score:
+            scores[scope] = score
+    if not scores:
+        return set()
+    best_score = max(scores.values())
+    return {
+        scope
+        for scope, score in scores.items()
+        if score == best_score or (best_score >= 6 and score >= best_score - 1)
+    }
 
 
 def _terms(text: str, *, query: bool = False) -> Counter[str]:
@@ -468,6 +583,7 @@ class KnowledgeBase:
 
         query_terms = set(query_counts)
         entry_count = len(self.qa_entries)
+        selected_scopes = _priority_qa_scopes(query)
 
         def idf(term: str) -> float:
             frequency = self.qa_document_frequency.get(term, 0)
@@ -478,6 +594,8 @@ class KnowledgeBase:
         lexical_candidates: list[tuple[int, KnowledgeMatch]] = []
 
         for entry_index, entry in enumerate(self.qa_entries):
+            if selected_scopes and entry.scope not in selected_scopes:
+                continue
             question_terms = set(entry.question_terms)
             answer_terms = set(entry.answer_terms)
             source_terms = set(entry.source_terms)
@@ -581,43 +699,66 @@ class KnowledgeBase:
 
         semantic_scores = self.semantic_qa_index.scores(query)
         if semantic_scores is None:
-            return lexical_candidates[0][1] if lexical_candidates else None
+            if not lexical_candidates:
+                return None
+            best = lexical_candidates[0][1]
+            runner_up_score = (
+                lexical_candidates[1][1].score if len(lexical_candidates) > 1 else 0.0
+            )
+            try:
+                fallback_relevance = float(
+                    os.getenv("KB_QA_LEXICAL_FALLBACK_RELEVANCE", "0.16")
+                )
+            except ValueError:
+                fallback_relevance = 0.16
+            if (
+                best.score < fallback_relevance * 100
+                or (runner_up_score and best.score < runner_up_score * 1.10)
+            ):
+                return None
+            return best
 
         try:
             semantic_threshold = min(
                 1.0,
-                max(0.0, float(os.getenv("KB_QA_SEMANTIC_THRESHOLD", "0.52"))),
+                max(0.0, float(os.getenv("KB_QA_SEMANTIC_THRESHOLD", "0.60"))),
             )
         except ValueError:
-            semantic_threshold = 0.52
+            semantic_threshold = 0.60
 
         lexical_by_index = {
             entry_index: match for entry_index, match in lexical_candidates
         }
-        hybrid_candidates: list[KnowledgeMatch] = []
+        hybrid_candidates: list[tuple[KnowledgeMatch, float]] = []
         for entry_index, semantic_score in enumerate(semantic_scores):
+            entry = self.qa_entries[entry_index]
+            if selected_scopes and entry.scope not in selected_scopes:
+                continue
             lexical_match = lexical_by_index.get(entry_index)
             lexical_relevance = (lexical_match.score / 100) if lexical_match else 0.0
-            if semantic_score < semantic_threshold and lexical_match is None:
-                continue
-            entry = self.qa_entries[entry_index]
+            if semantic_score < semantic_threshold:
+                if lexical_match is None or lexical_relevance < 0.18:
+                    continue
             combined_score = (
                 (0.62 * semantic_score)
                 + (0.38 * min(1.0, lexical_relevance))
             )
             hybrid_candidates.append(
-                KnowledgeMatch(
-                    title=entry.title,
-                    text=entry.answer,
-                    score=combined_score * 100,
-                    coverage=lexical_match.coverage if lexical_match else 0.0,
-                    matched_terms=(
-                        lexical_match.matched_terms if lexical_match else ("semantic",)
+                (
+                    KnowledgeMatch(
+                        title=entry.title,
+                        text=entry.answer,
+                        score=combined_score * 100,
+                        coverage=lexical_match.coverage if lexical_match else 0.0,
+                        matched_terms=(
+                            lexical_match.matched_terms if lexical_match else ("semantic",)
+                        ),
+                        kind="qa",
+                        standard_question=entry.question,
+                        standard_answer=entry.answer,
+                        semantic_score=semantic_score,
                     ),
-                    kind="qa",
-                    standard_question=entry.question,
-                    standard_answer=entry.answer,
-                    semantic_score=semantic_score,
+                    lexical_relevance,
                 )
             )
 
@@ -625,13 +766,25 @@ class KnowledgeBase:
             return None
         hybrid_candidates.sort(
             key=lambda item: (
-                -item.score,
-                -item.semantic_score,
-                -item.coverage,
-                item.title,
+                -item[0].score,
+                -item[0].semantic_score,
+                -item[0].coverage,
+                item[0].title,
             )
         )
-        return hybrid_candidates[0]
+        best, best_lexical_relevance = hybrid_candidates[0]
+        if best_lexical_relevance < 0.08 and len(hybrid_candidates) > 1:
+            runner_up = hybrid_candidates[1][0]
+            try:
+                semantic_margin = max(
+                    0.0,
+                    float(os.getenv("KB_QA_SEMANTIC_MARGIN", "0.035")),
+                )
+            except ValueError:
+                semantic_margin = 0.035
+            if best.semantic_score - runner_up.semantic_score < semantic_margin:
+                return None
+        return best
 
     def search(self, query: str, top_k: int = 4) -> KnowledgeSearchResult:
         skip_reason = self._skip_reason(query)
