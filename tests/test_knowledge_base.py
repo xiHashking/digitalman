@@ -113,6 +113,13 @@ class KnowledgeBaseTestCase(unittest.TestCase):
             any(document.title == "教育发展十五五规划/政策" for document in result.documents)
         )
 
+    def test_term_summary_question_routes_to_student_literacy_scope(self):
+        result = self.knowledge_base.search_with_scope_documents(
+            "系统在期末汇总时能帮老师做什么？"
+        )
+
+        self.assertEqual(result.scope, "AI素养评价产品QA")
+
     def test_additional_roots_merge_documents_in_the_same_scope(self):
         with tempfile.TemporaryDirectory() as additional_dir:
             additional_root = Path(additional_dir)

@@ -23,9 +23,13 @@ _CORE_MAIN_SECTIONS = (
 )
 _CASE_QUERY_RE = re.compile(r"案例|成功经验|学校.{0,6}(在用|使用)|实际效果")
 _TRANSFER_QUERY_RE = re.compile(
-    r"价格|报价|收费|合作|采购|试点|试用|定制|开发|对接|实施周期"
+    r"价格|报价|收费|多少钱|费用|年费|计费|合作|采购|试点|试用|定制|开发|对接|实施周期"
 )
 _MATERIAL_QUERY_RE = re.compile(r"资料|PDF|pdf|方案|文档|说明书")
+_BC_SPLIT_QUERY_RE = re.compile(
+    r"个人|自己用|体验|试用|免费|小程序|学校版|学校采购|单位评估|"
+    r"班级试点|老师使用|教师使用"
+)
 _PRODUCT_DETAIL_RE = re.compile(
     r"系统|产品|功能|报告|评价|学生|教师|老师|家长|学校|五育|"
     r"成长|档案|部署|培训|权限|数据|接口|招生|就业"
@@ -85,9 +89,12 @@ def _resolve_source(base: Path, relative_path: str) -> Path:
     return source
 
 
-def _extract_main_prompt(text: str) -> str:
+def _extract_main_prompt(text: str, question: str = "") -> str:
     lines = text.splitlines()
     selected: list[str] = []
+    selected_sections = set(_CORE_MAIN_SECTIONS)
+    if _BC_SPLIT_QUERY_RE.search(question or ""):
+        selected_sections.add("对话阶段判断")
 
     first_section = next(
         (index for index, line in enumerate(lines) if line.startswith("## ")),
@@ -102,7 +109,7 @@ def _extract_main_prompt(text: str) -> str:
             headings.append((index, len(match.group(1)), match.group(2)))
 
     for heading_index, level, title in headings:
-        if title not in _CORE_MAIN_SECTIONS:
+        if title not in selected_sections:
             continue
         end = len(lines)
         for next_index, next_level, _ in headings:
@@ -161,7 +168,10 @@ def load_ai_sales_strategy(question: str) -> AiSalesStrategyBundle | None:
     documents = [
         AiSalesPromptDocument(
             title=f"数字员工策略/{main_path.relative_to(strategy_root).as_posix()}",
-            text=_extract_main_prompt(main_path.read_text(encoding="utf-8")),
+            text=_extract_main_prompt(
+                main_path.read_text(encoding="utf-8"),
+                question,
+            ),
         )
     ]
 

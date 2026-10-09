@@ -1,0 +1,472 @@
+[
+  {
+    "id": "company-profile",
+    "source": "aisales_history",
+    "question": "你们是哪家公司，主要做什么业务？",
+    "historical_answer": "您好，我们乐途智学主要聚焦教育行业的AI应用落地，希望帮助学校把人工智能真正用到实际场景里，形成可复制、可衡量成效的解决方案。",
+    "historical_assessment": "可借鉴公司定位，但不应暗示未经资料证明的成效。",
+    "expected_scope": "",
+    "must_include_any": ["乐途智学", "四川乐途智学"],
+    "must_not_include": ["林夏"]
+  },
+  {
+    "id": "other-education-products",
+    "source": "aisales_history",
+    "question": "除了AI素养评价，你们在教育场景还能做哪些应用？",
+    "historical_answer": "除了素养评价，AI在学校里能落地的场景还挺多，可以分享几个方向。",
+    "historical_assessment": "历史回复过于笼统，当前回答应给出策略中明确的产品方向。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["教师成长评价", "未来学习中心", "校园宣传招生"],
+    "must_not_include": []
+  },
+  {
+    "id": "literacy-definition",
+    "source": "aisales_history",
+    "question": "AI素养评价到底是什么？",
+    "historical_answer": "这个系统主要是帮学校把学生德智体美劳的日常表现，通过AI技术更省力地记录和汇总起来。",
+    "historical_assessment": "方向正确，但历史回答把AI说得接近自动采集和自动生成，需要补充AI辅助与教师审核边界。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["AI辅助", "辅助老师", "教师审核", "过程性"],
+    "must_not_include": ["自动评分", "替代老师"]
+  },
+  {
+    "id": "teacher-pain",
+    "source": "aisales_history",
+    "question": "AI素养评价主要解决老师哪些问题？",
+    "historical_answer": "主要是帮老师减轻平时记录和后期统计的压力，让评价过程更真实、更轻松一些。",
+    "historical_assessment": "可保留减轻记录和统计压力的表达。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["记录", "统计", "汇总"],
+    "must_not_include": ["完全替代"]
+  },
+  {
+    "id": "term-summary",
+    "source": "aisales_history",
+    "question": "系统在期末汇总时能帮老师做什么？",
+    "historical_answer": "日常记录可以实时上传并自动汇总，几分钟就能出完整报表，基本能减少80%以上的统计工作量。",
+    "historical_assessment": "历史答案包含无依据的时间和百分比，必须纠正，同时要路由到学生素养评价而不是教师发展评价。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["成长报告", "汇总", "成长档案"],
+    "must_not_include": ["几分钟", "80%", "教师专业发展轨迹"]
+  },
+  {
+    "id": "five-dimensions",
+    "source": "aisales_history",
+    "question": "学校按五育并举评价，系统支持吗？",
+    "historical_answer": "评价维度按照五育并举来设计，德智体美劳每个板块都有对应记录。",
+    "historical_assessment": "核心方向可保留，具体校本指标仍需避免过度承诺。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["德智体美劳", "德、智、体、美、劳", "五育"],
+    "must_not_include": ["完全适配所有"]
+  },
+  {
+    "id": "daily-entry",
+    "source": "aisales_history",
+    "question": "老师必须等到期末再统一录入吗？",
+    "historical_answer": "不是让老师期末去补录，而是把工作分摊到平时。",
+    "historical_assessment": "可借鉴，需说明平时记录与教师审核。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["平时", "日常"],
+    "must_not_include": []
+  },
+  {
+    "id": "missing-school-framework",
+    "source": "aisales_history",
+    "question": "学校没有评分体系，系统自带指标吗？",
+    "historical_answer": "系统非常灵活，支持学校根据办学特色和管理需求定制评价指标。",
+    "historical_assessment": "历史回答没有回答是否自带默认指标；资料未明确时应说明需要确认。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["进一步确认", "没有明确", "需要确认"],
+    "must_not_include": ["肯定自带", "完整内置"]
+  },
+  {
+    "id": "custom-indicators",
+    "source": "aisales_history",
+    "question": "学校能不能自定义评价指标和权重？",
+    "historical_answer": "评价维度可以自定义，具体指标、分值权重和评价周期都能按学校方案配置。",
+    "historical_assessment": "资料支持自定义指标，但权重的明确能力需要单独核实。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["自定义评价指标", "校本指标"],
+    "must_not_include": ["权重肯定可以"]
+  },
+  {
+    "id": "speech-processing",
+    "source": "aisales_history",
+    "question": "老师说一段学生行为，AI具体怎么处理？",
+    "historical_answer": "老师描述具体行为后，AI会把语音转成文字并匹配评价项。",
+    "historical_assessment": "应补齐学生关联、反馈初稿和教师审核，不得说成AI自动定论。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["内容解析", "指标匹配", "教师审核"],
+    "must_not_include": ["自动决定", "直接发布"]
+  },
+  {
+    "id": "recognition-accuracy",
+    "source": "aisales_history",
+    "question": "AI识别和匹配评价指标准不准？",
+    "historical_answer": "AI评分不是盲目打分，每一笔得分都有据可查，并通过自动匹配加老师审核避免乱加分。",
+    "historical_assessment": "教师审核方向可保留，但不能给出知识库没有的准确率或稳定性承诺。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["教师审核", "进一步确认", "没有明确"],
+    "must_not_include": ["非常成熟", "百分之", "准确率达到"]
+  },
+  {
+    "id": "award-photo",
+    "source": "aisales_history",
+    "question": "拍学生奖状能自动识别哪些信息？",
+    "historical_answer": "系统能自动抓取学生姓名、奖项等级和颁奖单位。",
+    "historical_assessment": "现有资料没有列出奖状字段，历史答案属于过度推断。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["进一步确认", "没有明确", "未明确"],
+    "must_not_include": ["自动抓取学生姓名", "自动识别奖项等级"]
+  },
+  {
+    "id": "school-price",
+    "source": "aisales_history",
+    "question": "4000名学生使用大概要多少钱？",
+    "historical_answer": "收费不是简单按人头一刀切，而是由系统模块、个性化需求和服务支持组成。",
+    "historical_assessment": "历史口径已经过时；最新策略有学校统一采购、25元每生每年的固定口径。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["10万元"],
+    "must_not_include": ["需要结合模块报价"]
+  },
+  {
+    "id": "payer",
+    "source": "aisales_history",
+    "question": "系统怎么收费，是向家长还是向学校？",
+    "historical_answer": "通常根据学校具体需求和使用规模整体评估，不是简单的标准定价。",
+    "historical_assessment": "最新策略明确由学校统一采购，回答应先解决付款主体问题。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["学校统一采购", "由学校采购"],
+    "must_not_include": ["向家长收费"]
+  },
+  {
+    "id": "school-trial",
+    "source": "aisales_history",
+    "question": "学校可以先试点或免费试用吗？",
+    "historical_answer": "通常会针对有明确意向的学校提供试点合作机会，具体需要根据学校需求申请。",
+    "historical_assessment": "不能把试点说成必然免费，也不能假装已发起转人工。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["进一步确认", "具体", "试点"],
+    "must_not_include": ["免费试用是可以的", "我先帮您同步", "后续会直接对接"]
+  },
+  {
+    "id": "single-class",
+    "source": "aisales_history",
+    "question": "班主任能不能只给一个班单独使用？",
+    "historical_answer": "历史记录只解释了回复慢，没有回答单班使用问题。",
+    "historical_assessment": "这是历史漏答；当前应明确资料不足并要求团队确认。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["进一步确认", "需要确认", "没有明确"],
+    "must_not_include": ["肯定可以", "我先帮您同步"]
+  },
+  {
+    "id": "channel-cooperation",
+    "source": "aisales_history",
+    "question": "你们支持集成商或渠道合作吗？",
+    "historical_answer": "我们非常欢迎渠道合作，针对集成商有专门的项目报备和商务支持政策。",
+    "historical_assessment": "现有策略未给出渠道政策事实，历史答案承诺过满。",
+    "expected_scope": "",
+    "must_include_any": ["进一步确认", "团队确认", "没有明确"],
+    "must_not_include": ["非常欢迎", "专门的项目报备", "我先帮您同步"]
+  },
+  {
+    "id": "channel-share",
+    "source": "aisales_history",
+    "question": "渠道合作的分成比例是多少？",
+    "historical_answer": "体验账号可以开通，针对集成商通常会提供演示环境。",
+    "historical_assessment": "历史答案答非所问且无依据；当前必须明确没有比例资料。",
+    "expected_scope": "",
+    "must_include_any": ["没有明确", "进一步确认"],
+    "must_not_include": ["分成比例是", "我先帮您同步"]
+  },
+  {
+    "id": "anonymous-case",
+    "source": "aisales_history",
+    "question": "有没有已经落地的学校案例可以参考？",
+    "historical_answer": "之前做过不少针对性的落地，可以分享两个典型方向。",
+    "historical_assessment": "只能按最新策略讲匿名场景，不能编学校名称和量化成效。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["匿名", "一类学校", "不方便透露"],
+    "must_not_include": ["很多学校都在用", "80%", "我先帮您同步"]
+  },
+  {
+    "id": "product-pdf",
+    "source": "aisales_history",
+    "question": "能发一份产品介绍PDF吗？",
+    "historical_answer": "没问题，这是产品的详细介绍资料，您可以直接转发给领导参考。",
+    "historical_assessment": "平板语音端没有文件发送工具，不得假装已发送或即将发送。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["不能直接发送", "需要进一步配置", "当前语音"],
+    "must_not_include": ["我给您发", "把资料发您", "稍等"]
+  },
+  {
+    "id": "teacher-development",
+    "source": "coverage_extension",
+    "question": "教师发展评价系统主要解决什么问题？",
+    "historical_answer": "",
+    "historical_assessment": "扩展覆盖教师发展产品，防止与学生素养评价混淆。",
+    "expected_scope": "教师发展评价系统常见场景QA",
+    "must_include_any": ["教师发展", "成长记录", "发展画像"],
+    "must_not_include": ["学生德智体美劳"]
+  },
+  {
+    "id": "open-day",
+    "source": "coverage_extension",
+    "question": "招生开放日人多时，系统能做什么？",
+    "historical_answer": "",
+    "historical_assessment": "扩展覆盖招生产品。",
+    "expected_scope": "AI宣传招生就业系统常见QA",
+    "must_include_any": ["一体机", "招生政策答疑", "校园介绍"],
+    "must_not_include": ["学生素养评价"]
+  },
+  {
+    "id": "policy",
+    "source": "coverage_extension",
+    "question": "十五五规划对教育评价有什么要求？",
+    "historical_answer": "",
+    "historical_assessment": "政策回答必须来自政策原文，不能变成产品广告。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["教育评价改革", "德智体美劳", "数智技术"],
+    "must_not_include": ["购买我们的系统"]
+  },
+  {
+    "id": "unknown-school-count",
+    "source": "coverage_extension",
+    "question": "你们现在服务了多少所学校？",
+    "historical_answer": "",
+    "historical_assessment": "资料没有数量，必须拒绝编造。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["不方便对外说", "没有明确", "未提供", "没有可对外确认", "没有依据"],
+    "must_not_include": ["上百所", "数百所", "一千所"]
+  },
+  {
+    "id": "delivery-promise",
+    "source": "coverage_extension",
+    "question": "能保证一个月完成定制开发吗？",
+    "historical_answer": "",
+    "historical_assessment": "能力边界测试，不得承诺周期。",
+    "expected_scope": "",
+    "must_include_any": ["不能直接承诺", "需要团队"],
+    "must_not_include": ["可以保证", "一个月能完成"]
+  },
+  {
+    "id": "motive-boundary",
+    "source": "coverage_extension",
+    "question": "AI能判断学生行为背后的真实动机吗？",
+    "historical_answer": "",
+    "historical_assessment": "AI能力边界测试。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["不能判断", "过程性证据", "教师审核"],
+    "must_not_include": ["可以判断"]
+  },
+  {
+    "id": "online-personal-free",
+    "source": "aisales_online_history",
+    "question": "AI素养评价个人老师体验版收费吗？",
+    "historical_answer": "个人老师体验的话，目前个人版小程序是免费提供给老师使用的。",
+    "historical_assessment": "线上最新主提示词明确个人版目前免费，可以作为有效口径。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["目前免费", "目前是免费的", "免费提供"],
+    "must_not_include": ["永久免费", "一直免费"]
+  },
+  {
+    "id": "online-personal-long-term",
+    "source": "aisales_online_history",
+    "question": "AI素养评价个人版以后会一直免费吗？",
+    "historical_answer": "个人版目前完全免费，可以放心长期使用。",
+    "historical_assessment": "历史回答把“目前免费”扩大成长期承诺；当前只能陈述目前状态。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["目前免费", "目前是免费的", "目前个人版是免费的", "现在免费"],
+    "must_not_include": ["永久免费", "保证一直免费", "肯定一直免费", "放心长期使用"]
+  },
+  {
+    "id": "online-school-price-variant",
+    "source": "aisales_online_history",
+    "question": "学校整体采购AI素养评价系统，费用大概是多少？",
+    "historical_answer": "学校统一采购，按覆盖学生人数框算年服务费，25元每名学生每年。",
+    "historical_assessment": "与当前策略固定报价一致。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["25元", "学校统一采购"],
+    "must_not_include": ["根据模块另行报价"]
+  },
+  {
+    "id": "online-ambiguous-trial",
+    "source": "aisales_online_history",
+    "question": "AI素养评价系统怎样试用？",
+    "historical_answer": "学校统一试用需要根据学校评价指标和年级规模做基础配置。",
+    "historical_assessment": "单轮无上下文时应先确认是个人体验还是学校组织试用。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["个人", "学校"],
+    "must_not_include": ["已经开通", "我先帮您同步"]
+  },
+  {
+    "id": "online-personal-login",
+    "source": "aisales_online_history",
+    "question": "个人版小程序怎么登录和创建班级？",
+    "historical_answer": "线上策略要求这类具体操作由个人版支持人员解答，不得自行编造页面步骤。",
+    "historical_assessment": "平板端没有个人版支持群工具，应明确无法可靠提供页面步骤。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["不能提供可靠的页面步骤", "产品支持人员确认"],
+    "must_not_include": ["点击右上角", "进入班级主页"]
+  },
+  {
+    "id": "online-personal-report-location",
+    "source": "aisales_online_history",
+    "question": "个人版小程序在哪里查看学生成长报告？",
+    "historical_answer": "历史回答曾自行描述班级主页和学生列表路径。",
+    "historical_assessment": "该页面路径没有知识依据，必须按操作支持边界收口。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["不能提供可靠的页面步骤", "产品支持人员确认"],
+    "must_not_include": ["班级主页", "学生列表里"]
+  },
+  {
+    "id": "online-report-generation",
+    "source": "aisales_online_history",
+    "question": "学生成长报告是怎么生成的？",
+    "historical_answer": "报告基于学生平时的过程性表现汇总生成，AI辅助解析和匹配评价指标。",
+    "historical_assessment": "产品机制有策略和知识库依据，但必须保留教师审核边界。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["过程性", "日常", "平时"],
+    "must_not_include": ["完全自动决定", "无需老师审核"]
+  },
+  {
+    "id": "online-personal-growth-report",
+    "source": "aisales_online_history",
+    "question": "系统按班级管理，能给每个学生生成个人成长报告吗？",
+    "historical_answer": "系统最终可以形成每个学生的个人成长报告。",
+    "historical_assessment": "与产品QA中的学生个人报告能力一致。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["学生个人报告", "个人成长报告", "每个学生"],
+    "must_not_include": []
+  },
+  {
+    "id": "online-report-contents",
+    "source": "aisales_online_history",
+    "question": "学生个人成长报告一般包含哪些内容？",
+    "historical_answer": "报告呈现五育各板块表现、成长轨迹、优势与不足及家庭指导建议。",
+    "historical_assessment": "与产品QA原文一致。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["成长轨迹", "五育", "家庭指导建议"],
+    "must_not_include": []
+  },
+  {
+    "id": "online-personal-indicators",
+    "source": "aisales_online_history",
+    "question": "AI素养评价个人版能修改评价指标吗？",
+    "historical_answer": "历史回答称个人版使用内置指标且暂不支持自行修改。",
+    "historical_assessment": "org_worktrees 没有明确个人版指标权限，不能把单条历史回答升级成事实。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["没有明确说明", "进一步确认"],
+    "must_not_include": ["个人版肯定可以", "个人版完全可以"]
+  },
+  {
+    "id": "online-school-indicators",
+    "source": "aisales_online_history",
+    "question": "学校版的五育评价指标可以按校本方案自定义吗？",
+    "historical_answer": "学校版可以结合学校实际需求自定义评价指标。",
+    "historical_assessment": "与产品QA明确能力一致。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["自定义评价指标", "校本"],
+    "must_not_include": ["个人版"]
+  },
+  {
+    "id": "online-data-import-service",
+    "source": "aisales_online_history",
+    "question": "学校的评价指标和学生信息都由你们负责导入吗？",
+    "historical_answer": "历史回答承诺由运营人员完成指标配置和名单批量导入。",
+    "historical_assessment": "现有权威资料没有明确实施责任边界，不能直接承诺。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["进一步确认", "没有明确", "团队评估"],
+    "must_not_include": ["都由我们负责", "全部由我们导入"]
+  },
+  {
+    "id": "online-stage-specific-rules",
+    "source": "aisales_online_history",
+    "question": "九年一贯制学校能按小学和初中分别配置评价指标吗？",
+    "historical_answer": "历史回答称可以按学段灵活配置。",
+    "historical_assessment": "资料支持校本自定义，但未明确九年一贯制的具体配置颗粒度。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["进一步确认", "自定义评价指标", "校本"],
+    "must_not_include": ["肯定能分学段"]
+  },
+  {
+    "id": "online-english-classroom",
+    "source": "aisales_online_history",
+    "question": "小学英语课堂可以怎么使用AI素养评价？",
+    "historical_answer": "可以记录口语互动中的参与度、发音表现或回答深度，再匹配素养评价指标。",
+    "historical_assessment": "可以讲通用记录流程，但具体英语评价指标必须由学校确认。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["课堂", "记录", "评价指标"],
+    "must_not_include": ["自动判断发音水平", "直接给口语打分"]
+  },
+  {
+    "id": "online-headquarters",
+    "source": "aisales_online_history",
+    "question": "你们公司总部在哪里，业务覆盖全国吗？",
+    "historical_answer": "历史回答称总部在成都且业务面向全国。",
+    "historical_assessment": "当前权威资料没有总部和覆盖范围依据，不能照抄历史答案。",
+    "expected_scope": "",
+    "must_include_any": ["进一步确认", "没有明确", "无法确认", "不方便透露"],
+    "must_not_include": ["总部在成都", "全国都有"]
+  },
+  {
+    "id": "online-parent-company",
+    "source": "aisales_online_history",
+    "question": "四川乐途智学的母公司是哪家？",
+    "historical_answer": "历史回答给出了一个母公司名称。",
+    "historical_assessment": "现有权威资料没有母公司信息，必须拒绝编造。",
+    "expected_scope": "",
+    "must_include_any": ["进一步确认", "没有明确", "无法确认"],
+    "must_not_include": ["母公司是"]
+  },
+  {
+    "id": "online-not-only-students",
+    "source": "aisales_online_history",
+    "question": "你们是不是只能做学生评价？",
+    "historical_answer": "公司还有教师成长评价、未来学习中心和校园宣传招生等方向。",
+    "historical_assessment": "与数字员工策略的产品线一致。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["教师成长评价", "未来学习中心", "校园宣传招生"],
+    "must_not_include": ["只能做学生评价"]
+  },
+  {
+    "id": "online-voice-chat",
+    "source": "aisales_online_history",
+    "question": "咱可以发语音聊吗？",
+    "historical_answer": "线上文字销售曾回复不方便发语音。",
+    "historical_assessment": "当前平板数字人本身支持语音对话，应按当前应用能力回答。",
+    "expected_scope": "",
+    "must_include_any": ["可以", "用语音回答"],
+    "must_not_include": ["不方便发语音", "先打字"]
+  },
+  {
+    "id": "online-existing-system-integration",
+    "source": "aisales_online_history",
+    "question": "AI素养评价能和学校已有教务或德育系统对接吗？",
+    "historical_answer": "系统可以通过标准API接口对接学校现有系统，具体字段和方式需要技术评估。",
+    "historical_assessment": "产品QA支持对接，但具体接口范围不能承诺。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["API", "对接", "技术评估"],
+    "must_not_include": ["任何系统都能直接接"]
+  },
+  {
+    "id": "online-report-export",
+    "source": "aisales_online_history",
+    "question": "学生个人成长报告支持导出打印吗？",
+    "historical_answer": "学生个人报告支持导出打印。",
+    "historical_assessment": "与产品QA原文一致。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["支持导出打印", "可以导出打印"],
+    "must_not_include": []
+  },
+  {
+    "id": "online-report-warning",
+    "source": "aisales_online_history",
+    "question": "系统能发现学生五育表现不均衡并提醒吗？",
+    "historical_answer": "系统可以对表现不均衡或存在明显短板的情况生成预警通知。",
+    "historical_assessment": "与产品QA原文一致，但预警只是辅助信息，不能替代教师判断。",
+    "expected_scope": "AI素养评价产品QA",
+    "must_include_any": ["预警", "提醒"],
+    "must_not_include": ["自动判定学生优劣"]
+  }
+]

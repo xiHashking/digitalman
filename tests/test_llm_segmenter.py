@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from knowledge_base import KnowledgeDocument, KnowledgeMatch, KnowledgeSearchResult
 from knowledge_qa_agent import KnowledgeQaAnswer, KnowledgeQaEvidence
+from knowledge_qa_agent import KnowledgeQaError
 from llm import (
     AI_LITERACY_PRODUCT_POLICY,
     SpeechSegmenter,
@@ -50,6 +51,24 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         prompt = _build_system_prompt("招生系统有什么功能？", result, 6000)
 
         self.assertNotIn(AI_LITERACY_PRODUCT_POLICY, prompt)
+
+    def test_fallback_prompt_forbids_unavailable_sales_actions(self):
+        result = KnowledgeSearchResult(query="可以试点吗？", matches=())
+        strategy = KnowledgeDocument(
+            scope="数字员工策略",
+            title="数字员工策略/main.md",
+            text="需要时转人工。",
+        )
+
+        prompt = _build_system_prompt(
+            "可以试点吗？",
+            result,
+            6000,
+            strategy_documents=(strategy,),
+        )
+
+        self.assertIn("没有转人工、联系同事或发送文件的能力", prompt)
+        self.assertIn("不得声称已经同步", prompt)
 
     def test_policy_guard_recognizes_ai_boundary_and_commitment_questions(self):
         ai_result = KnowledgeSearchResult(
@@ -173,6 +192,57 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         self.assertIn("需要团队", speech)
         self.assertIn("不能直接承诺", speech)
 
+    def test_pdf_request_does_not_claim_file_was_sent(self):
+        spoken = []
+        avatar = SimpleNamespace(
+            opt=SimpleNamespace(),
+            put_msg_txt=lambda text, data: spoken.append(text),
+        )
+
+        with (
+            patch("llm.search_knowledge") as search,
+            patch("llm._llm_client") as client_factory,
+        ):
+            llm_response("能发一份产品介绍PDF吗？", avatar)
+
+        search.assert_not_called()
+        client_factory.assert_not_called()
+        speech = "".join(spoken)
+        self.assertIn("不能直接发送PDF", speech)
+        self.assertIn("需要在平板应用中单独配置", speech)
+
+    def test_personal_app_operation_does_not_invent_page_steps(self):
+        answer = _direct_guard_answer("个人版小程序在哪里查看成长报告？")
+
+        self.assertIn("不能提供可靠的页面步骤", answer)
+        self.assertIn("产品支持人员确认", answer)
+
+    def test_voice_chat_request_matches_tablet_capability(self):
+        self.assertEqual(
+            _direct_guard_answer("咱可以发语音聊吗？"),
+            "可以，您直接说就行，我会用语音回答。",
+        )
+
+    def test_personal_indicator_question_does_not_inherit_school_capability(self):
+        answer = _direct_guard_answer("个人版能自定义评价指标吗？")
+
+        self.assertIn("学校版支持自定义评价指标", answer)
+        self.assertIn("个人版能否修改没有明确说明", answer)
+
+    def test_school_price_calculates_the_requested_student_count(self):
+        answer = _direct_guard_answer("4000名学生使用大概要多少钱？")
+
+        self.assertIn("25元", answer)
+        self.assertIn("4000名学生约10万元每年", answer)
+        self.assertIn("学校统一采购", answer)
+
+    def test_report_generation_uses_process_evidence_and_teacher_review(self):
+        answer = _direct_guard_answer("学生成长报告是怎么生成的？")
+
+        self.assertIn("平时的过程性记录", answer)
+        self.assertIn("AI辅助", answer)
+        self.assertIn("教师审核", answer)
+
     def test_incoherent_asr_is_not_repeated(self):
         self.assertEqual(
             _direct_guard_answer("你看在小红书上实页个分是这个呀"),
@@ -277,6 +347,52 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         self.assertIn("可以", speech)
         self.assertIn("第一项", speech)
         self.assertIn("第二项", speech)
+
+    def test_failed_knowledge_agent_uses_targeted_llm_instead_of_raw_qa(self):
+        avatar = SimpleNamespace(
+            opt=SimpleNamespace(),
+            put_msg_txt=lambda text, data: spoken.append(text),
+        )
+        spoken = []
+        result = KnowledgeSearchResult(
+            query="学生个人成长报告支持导出吗？",
+            matches=(
+                KnowledgeMatch(
+                    title="标准问答",
+                    text="学生报告支持导出。其他报告内容很多。",
+                    score=100,
+                    coverage=1,
+                    matched_terms=("导出",),
+                    kind="qa",
+                    standard_question="系统会生成哪些报告？",
+                    standard_answer="学生报告支持导出。其他报告内容很多。",
+                ),
+            ),
+        )
+        chunks = [
+            SimpleNamespace(
+                choices=[SimpleNamespace(delta=SimpleNamespace(content="支持导出。"))]
+            )
+        ]
+        create = Mock(return_value=chunks)
+        client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+        )
+
+        with (
+            patch("llm.search_knowledge", return_value=result),
+            patch("llm._llm_client", return_value=client),
+            patch("llm._llm_model", return_value="test-model"),
+            patch(
+                "llm.answer_knowledge_question",
+                side_effect=KnowledgeQaError("invalid"),
+            ),
+        ):
+            llm_response("学生个人成长报告支持导出吗？", avatar)
+
+        self.assertEqual("".join(spoken), "支持导出。")
+        self.assertEqual(create.call_count, 1)
+        self.assertEqual(create.call_args.kwargs["temperature"], 0.1)
 
 
 if __name__ == '__main__':

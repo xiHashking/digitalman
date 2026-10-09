@@ -188,6 +188,60 @@ class KnowledgeQaAgentTestCase(unittest.TestCase):
         self.assertIn("每次只处理当前用户问题", system_prompt)
         self.assertIn("数字员工策略/main.md", system_prompt)
 
+    def test_retries_when_answer_claims_unavailable_handoff_action(self):
+        client = self._client_with_payloads(
+            {
+                "answer": "我可以先帮您把情况同步给同事，后续会直接联系您。",
+                "evidence": [
+                    {"source": "产品介绍/产品介绍", "quote": "成长档案"}
+                ],
+                "gaps": [],
+            },
+            {
+                "answer": "具体合作方式需要团队进一步确认。",
+                "evidence": [],
+                "gaps": ["具体合作方式"],
+            },
+        )
+
+        answer = answer_knowledge_question(
+            client,
+            model="test-model",
+            question="怎么合作？",
+            result=self.result,
+        )
+
+        self.assertEqual(client.chat.completions.create.call_count, 2)
+        self.assertNotIn("同步", answer.answer)
+
+    def test_retries_when_voice_answer_is_too_long(self):
+        client = self._client_with_payloads(
+            {
+                "answer": "这" * 141,
+                "evidence": [
+                    {"source": "产品介绍/产品介绍", "quote": "成长档案"}
+                ],
+                "gaps": [],
+            },
+            {
+                "answer": "家长可以查看孩子的成长档案。",
+                "evidence": [
+                    {"source": "产品介绍/产品介绍", "quote": "成长档案"}
+                ],
+                "gaps": [],
+            },
+        )
+
+        answer = answer_knowledge_question(
+            client,
+            model="test-model",
+            question=self.result.query,
+            result=self.result,
+        )
+
+        self.assertEqual(client.chat.completions.create.call_count, 2)
+        self.assertLessEqual(len(answer.answer), 140)
+
 
 if __name__ == "__main__":
     unittest.main()

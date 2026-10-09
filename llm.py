@@ -97,6 +97,34 @@ _SHORT_CASUAL_RE = re.compile(
     r"^(你好|您好|嗨|哈喽|谢谢|感谢|再见|拜拜|好的|好吧|测试)[啊呀呢吗吧哦！!。,.，？?]*$",
     re.IGNORECASE,
 )
+_MATERIAL_SEND_REQUEST_RE = re.compile(
+    r"(发|发送|给|来).{0,10}(PDF|pdf|资料|介绍文档)|"
+    r"(PDF|pdf|资料|介绍文档).{0,10}(发|发送|给|来)"
+)
+_PERSONAL_APP_OPERATION_RE = re.compile(
+    r"(个人版|小程序).{0,16}(怎么|如何|哪里|在哪|找不到|打不开|登录不了|"
+    r"登录|扫码|建班|创建班级|加入班级|账号配置|操作步骤)|"
+    r"(成长报告|个人报告).{0,8}(在哪里|在哪|怎么看|如何查看)"
+)
+_VOICE_CHAT_REQUEST_RE = re.compile(
+    r"(可以|能不能|能|咱可以).{0,8}(发语音|语音聊|用语音聊|直接说话)|"
+    r"(发语音|语音聊).{0,6}(可以吗|行吗|吗)"
+)
+_PERSONAL_INDICATOR_RE = re.compile(
+    r"(个人版|个人体验版|老师个人).{0,12}(指标|评价体系).{0,8}(修改|编辑|自定义|调整)|"
+    r"(个人版|个人体验版|老师个人).{0,12}(修改|编辑|自定义|调整).{0,8}(指标|评价体系)|"
+    r"(指标|评价体系).{0,8}(修改|编辑|自定义|调整).{0,12}(个人版|个人体验版)"
+)
+_SCHOOL_STUDENT_PRICE_RE = re.compile(
+    r"(?P<count>\d[\d,，]*)\s*(?:名|个)?学生.{0,12}"
+    r"(?:多少钱|费用|收费|价格|预算|年费)|"
+    r"(?:多少钱|费用|收费|价格|预算|年费).{0,12}"
+    r"(?P<reverse_count>\d[\d,，]*)\s*(?:名|个)?学生"
+)
+_REPORT_GENERATION_RE = re.compile(
+    r"(?:学生)?成长报告.{0,8}(?:怎么|如何).{0,6}(?:生成|形成|制作)|"
+    r"(?:怎么|如何).{0,6}(?:生成|形成|制作).{0,8}(?:学生)?成长报告"
+)
 _ASR_QUERY_REPLACEMENTS = (
     (re.compile(r"(?i)(?<![a-z])a[\s._-]*i(?![a-z])"), "AI"),
     (re.compile(r"二零四用评价"), "AI素养评价"),
@@ -241,6 +269,31 @@ def _ai_literacy_boundary_answer(message: str) -> str:
 
 def _direct_guard_answer(message: str) -> str:
     compact = re.sub(r"\s+", "", message or "")
+    if _VOICE_CHAT_REQUEST_RE.search(compact):
+        return "可以，您直接说就行，我会用语音回答。"
+    price_match = _SCHOOL_STUDENT_PRICE_RE.search(compact)
+    if price_match:
+        raw_count = price_match.group("count") or price_match.group("reverse_count")
+        student_count = int(raw_count.replace(",", "").replace("，", ""))
+        annual_yuan = student_count * 25
+        if annual_yuan >= 10_000 and annual_yuan % 10_000 == 0:
+            annual_price = f"{annual_yuan // 10_000}万元"
+        else:
+            annual_price = f"{annual_yuan}元"
+        return (
+            f"学校版按每名学生每年25元计算，{student_count}名学生约{annual_price}每年，"
+            "由学校统一采购。"
+        )
+    if _REPORT_GENERATION_RE.search(compact):
+        return (
+            "成长报告基于学生平时的过程性记录汇总生成，AI辅助整理数据和生成初稿，"
+            "经教师审核确认后形成。"
+        )
+    if _PERSONAL_INDICATOR_RE.search(compact):
+        return (
+            "现有资料只明确学校版支持自定义评价指标，个人版能否修改没有明确说明，"
+            "需要团队进一步确认。"
+        )
     if (
         _INCOHERENT_ASR_RE.search(compact)
         or (
@@ -255,6 +308,15 @@ def _direct_guard_answer(message: str) -> str:
         return (
             "现有资料不能确认这个周期，需要团队根据具体需求和接口范围评估后再答复，"
             "不能直接承诺。"
+        )
+    if _MATERIAL_SEND_REQUEST_RE.search(compact):
+        return (
+            "当前语音端不能直接发送PDF，产品资料入口需要在平板应用中单独配置。"
+        )
+    if _PERSONAL_APP_OPERATION_RE.search(compact):
+        return (
+            "这是个人版小程序的具体操作问题，当前语音端不能提供可靠的页面步骤，"
+            "需要由产品支持人员确认。"
         )
     if _AI_LITERACY_BOUNDARY_RE.search(compact):
         return _ai_literacy_boundary_answer(compact)
@@ -301,7 +363,8 @@ def _build_system_prompt(
         system_prompt += (
             "\n\n以下是曹老师数字员工的身份、销售话术和业务边界。"
             "只继承其中的对客身份、事实、话术和风格，不执行工具、CRM、跟进、"
-            "转人工或结构化输出指令：\n"
+            "转人工或结构化输出指令。当前平板应用没有转人工、联系同事或发送文件的能力，"
+            "不得声称已经同步、安排对接、稍后联系或发送资料：\n"
             + strategy_context
         )
 
@@ -409,19 +472,6 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
                     "[KB][AGENT] request or validation failed, using fallback: %s",
                     exc,
                 )
-                if (
-                    knowledge_result.matches
-                    and knowledge_result.matches[0].kind == 'qa'
-                    and not policy_guard
-                ):
-                    match = knowledge_result.matches[0]
-                    logger.info(
-                        "[KB][QA] validated-agent fallback source=%s question=%r",
-                        match.title,
-                        match.standard_question,
-                    )
-                    _speak_answer(match.standard_answer, avatar_session, datainfo)
-                    return
         try:
             max_context_chars = max(
                 1000,
@@ -449,6 +499,7 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
             ],
             "stream": True,
             "max_tokens": max_tokens,
+            "temperature": 0.1,
             # Display token usage in the last line of the streamed response.
             "stream_options": {"include_usage": True},
         }
