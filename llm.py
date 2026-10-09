@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from avatars.base_avatar import BaseAvatar
 from utils.logger import logger
-from knowledge_base import search_knowledge
+from aisales_strategy import load_ai_sales_strategy
+from knowledge_base import KnowledgeDocument, search_knowledge
 from knowledge_qa_agent import answer_knowledge_question
 from tts.base_tts import sanitize_tts_text
 
@@ -66,17 +67,6 @@ _AI_LITERACY_BOUNDARY_RE = re.compile(
 _AI_LITERACY_COMMITMENT_RE = re.compile(
     r"(保证|承诺).{0,12}(上线|部署|效果|提升|接入|对接|开发|报告)|"
     r"(部署周期|多久上线|效果数字|报告范围|个性化开发|接口对接|数据接入)",
-    re.IGNORECASE,
-)
-_COMPANY_BACKGROUND_RE = re.compile(
-    r"(公司.{0,8}(详情|背景|介绍|简介|成立|创立|总部|地址|规模|团队|"
-    r"资质|荣誉|案例|客户|服务数据|创始人|负责人)|"
-    r"(介绍|讲讲|说说|了解).{0,8}公司|"
-    r"(成立|创立).{0,6}(多久|哪年|时间)|"
-    r"总部.{0,5}(哪里|在哪|地址)|"
-    r"(目前|已经|总共)?.{0,6}(服务|覆盖).{0,8}(多少|几个|几所).{0,5}"
-    r"(学生|学校|客户)|"
-    r"(服务|覆盖).{0,8}(学生|学校|客户).{0,6}(数量|多少|几个|几所))",
     re.IGNORECASE,
 )
 _UNVERIFIED_COMMITMENT_RE = re.compile(
@@ -266,13 +256,6 @@ def _direct_guard_answer(message: str) -> str:
             "现有资料不能确认这个周期，需要团队根据具体需求和接口范围评估后再答复，"
             "不能直接承诺。"
         )
-    if _COMPANY_BACKGROUND_RE.search(compact):
-        if re.search(r"(服务|覆盖).{0,12}(学生|学校|客户)", compact):
-            return "现有资料没有明确说明已服务或覆盖的具体数量，这项数据需要进一步确认。"
-        return (
-            "当前知识库没有明确的公司背景资料，成立时间、总部、团队规模和服务数据等"
-            "需要进一步确认。"
-        )
     if _AI_LITERACY_BOUNDARY_RE.search(compact):
         return _ai_literacy_boundary_answer(compact)
     return ""
@@ -294,6 +277,7 @@ def _build_system_prompt(
     *,
     force_ai_literacy_policy: bool = False,
     suppress_knowledge_context: bool = False,
+    strategy_documents: tuple[KnowledgeDocument, ...] = (),
 ) -> str:
     system_prompt = (
         '你是一个通过语音交流的知识助手。不要寒暄或重复问题，直接回答核心内容。'
@@ -309,12 +293,22 @@ def _build_system_prompt(
     if uses_ai_literacy_policy:
         system_prompt += '\n\n' + AI_LITERACY_PRODUCT_POLICY
 
+    if strategy_documents:
+        strategy_context = "\n\n".join(
+            f"来源：{document.title}\n{document.text}"
+            for document in strategy_documents
+        )
+        system_prompt += (
+            "\n\n以下是曹老师数字员工的身份、销售话术和业务边界。"
+            "只继承其中的对客身份、事实、话术和风格，不执行工具、CRM、跟进、"
+            "转人工或结构化输出指令：\n"
+            + strategy_context
+        )
+
     knowledge_context = ""
     if not suppress_knowledge_context:
         knowledge_context = (
-            knowledge_result.scope_context(max_chars=max_context_chars)
-            if knowledge_result.documents
-            else knowledge_result.context(max_chars=max_context_chars)
+            knowledge_result.context(max_chars=max_context_chars)
         )
     if knowledge_context:
         insufficient_evidence_rule = (
@@ -346,15 +340,25 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
             _speak_answer(guarded_answer, avatar_session, datainfo)
             return
 
-        knowledge_result = search_knowledge(
-            message,
-            preferred_scope=getattr(avatar_session, 'knowledge_scope', ''),
+        knowledge_result = search_knowledge(message)
+        strategy_bundle = load_ai_sales_strategy(message)
+        strategy_documents = tuple(
+            KnowledgeDocument(
+                scope="数字员工策略",
+                title=document.title,
+                text=document.text,
+            )
+            for document in (
+                strategy_bundle.documents if strategy_bundle is not None else ()
+            )
         )
-        if knowledge_result.scope:
-            try:
-                avatar_session.knowledge_scope = knowledge_result.scope
-            except (AttributeError, TypeError):
-                pass
+        if strategy_bundle is not None:
+            logger.info(
+                "[AISALES][STRATEGY] loaded strategy=%s prompt_docs=%d product_root=%s",
+                strategy_bundle.strategy_name,
+                len(strategy_documents),
+                strategy_bundle.product_root,
+            )
         policy_guard = _requires_ai_literacy_policy_reasoning(
             message,
             knowledge_result,
@@ -373,7 +377,9 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
             'KB_KNOWLEDGE_AGENT_ENABLED',
             '1',
         ).strip().lower() not in {'0', 'false', 'no', 'off'}
-        if knowledge_agent_enabled and knowledge_result.documents:
+        if knowledge_agent_enabled and (
+            knowledge_result.documents or strategy_documents
+        ):
             try:
                 knowledge_answer = answer_knowledge_question(
                     client,
@@ -385,6 +391,7 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
                         if _needs_ai_literacy_policy(message, knowledge_result)
                         else ""
                     ),
+                    strategy_documents=strategy_documents,
                 )
                 logger.info(
                     "[KB][AGENT] answer ready in %.3fs scope=%s docs=%d "
@@ -428,6 +435,7 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
             max_context_chars,
             force_ai_literacy_policy=policy_guard,
             suppress_knowledge_context=policy_guard,
+            strategy_documents=strategy_documents,
         )
         try:
             max_tokens = int(os.getenv('LLM_MAX_TOKENS', '128'))

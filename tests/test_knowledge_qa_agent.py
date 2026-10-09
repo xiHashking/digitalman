@@ -154,6 +154,40 @@ class KnowledgeQaAgentTestCase(unittest.TestCase):
                 result=self.result,
             )
 
+    def test_strategy_document_can_ground_company_answer_without_product_match(self):
+        result = KnowledgeSearchResult(query="你们是哪家公司？", matches=())
+        strategy_document = KnowledgeDocument(
+            scope="数字员工策略",
+            title="数字员工策略/main.md",
+            text="你是四川乐途智学的曹老师，负责教育产品咨询。",
+        )
+        client = self._client_with_payloads(
+            {
+                "answer": "我是四川乐途智学的曹老师，负责教育产品咨询。",
+                "evidence": [
+                    {
+                        "source": "数字员工策略/main.md",
+                        "quote": "四川乐途智学的曹老师",
+                    }
+                ],
+                "gaps": [],
+            }
+        )
+
+        answer = answer_knowledge_question(
+            client,
+            model="test-model",
+            question=result.query,
+            result=result,
+            strategy_documents=(strategy_document,),
+        )
+
+        self.assertIn("四川乐途智学", answer.answer)
+        request = client.chat.completions.create.call_args.kwargs
+        system_prompt = request["messages"][0]["content"]
+        self.assertIn("每次只处理当前用户问题", system_prompt)
+        self.assertIn("数字员工策略/main.md", system_prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

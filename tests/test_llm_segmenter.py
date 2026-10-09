@@ -125,21 +125,33 @@ class SpeechSegmenterTestCase(unittest.TestCase):
         self.assertNotIn("错误候选答案", "".join(spoken))
         self.assertIn("不能", "".join(spoken))
 
-    def test_company_unknown_facts_are_answered_without_search_or_llm(self):
+    def test_company_unknown_facts_use_single_turn_strategy_and_stay_uncertain(self):
         spoken = []
         avatar = SimpleNamespace(
             opt=SimpleNamespace(),
             put_msg_txt=lambda text, data: spoken.append(text),
         )
+        result = KnowledgeSearchResult(
+            query="目前已经服务了多少学生？",
+            matches=(),
+        )
+        answer = KnowledgeQaAnswer(
+            answer="现有资料没有明确说明服务数量，需要进一步确认。",
+            evidence=(),
+            gaps=("服务学生数量",),
+        )
 
         with (
-            patch("llm.search_knowledge") as search,
-            patch("llm._llm_client") as client_factory,
+            patch("llm.search_knowledge", return_value=result) as search,
+            patch("llm._llm_client", return_value=Mock()) as client_factory,
+            patch("llm._llm_model", return_value="test-model"),
+            patch("llm.answer_knowledge_question", return_value=answer) as agent,
         ):
             llm_response("目前已经服务了多少学生？", avatar)
 
-        search.assert_not_called()
-        client_factory.assert_not_called()
+        search.assert_called_once_with("目前已经服务了多少学生？")
+        client_factory.assert_called_once()
+        agent.assert_called_once()
         self.assertIn("需要进一步确认", "".join(spoken))
 
     def test_unverified_custom_development_timeline_is_not_promised(self):

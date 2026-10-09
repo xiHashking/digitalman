@@ -11,6 +11,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from aisales_strategy import configured_ai_sales_product_root
 from utils.logger import logger
 
 
@@ -18,6 +19,7 @@ _CJK_SEQUENCE_RE = re.compile(r"[\u4e00-\u9fff]+")
 _ASCII_TERM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]*")
 _DEFAULT_MAX_CHARS = 1200
 _DEFAULT_CONTEXT_CHARS = 6000
+_BUNDLED_KNOWLEDGE_ROOT = Path(__file__).resolve().parent / "knowledge"
 _PRIORITY_QA_SCOPES = {
     "AI素养评价产品QA",
     "教师发展评价系统常见场景QA",
@@ -58,6 +60,12 @@ _CASUAL_QUERY_RE = re.compile(
 )
 _KB_META_QUERY_RE = re.compile(
     r"(知识库|资料库).{0,8}(有问题|不对|错误|坏了|奇怪|不准确|不靠谱|肯定有问题)"
+)
+_COMPANY_PROFILE_QUERY_RE = re.compile(
+    r"(哪家|什么|哪个公司|你们|贵).{0,5}公司|"
+    r"公司.{0,8}(背景|介绍|简介|成立|创立|总部|地址|规模|团队|资质|荣誉)|"
+    r"(介绍|讲讲|说说|了解).{0,8}(你们|贵)?公司|"
+    r"(成立|创立).{0,6}(多久|哪年|时间)|总部.{0,5}(哪里|在哪|地址)"
 )
 _QA_ROLE_TERMS = {
     "家长", "考生", "学生", "老师", "教师", "校长", "管理者",
@@ -672,8 +680,18 @@ class _LocalSemanticQaIndex:
 
 
 class KnowledgeBase:
-    def __init__(self, root: Path):
-        self.root = root
+    def __init__(self, root: Path, additional_roots: tuple[Path, ...] = ()):
+        roots: list[Path] = []
+        seen_roots: set[Path] = set()
+        for candidate in (root, *additional_roots):
+            resolved = candidate.expanduser().resolve()
+            if resolved in seen_roots:
+                continue
+            seen_roots.add(resolved)
+            roots.append(resolved)
+
+        self.root = roots[0]
+        self.roots = tuple(roots)
         self.chunks: list[_Chunk] = []
         self.document_frequency: dict[str, int] = {}
         self.scope_terms: dict[str, frozenset[str]] = {}
@@ -696,40 +714,49 @@ class KnowledgeBase:
         return source_scope
 
     def _load(self) -> None:
-        if not self.root.is_dir():
-            logger.warning("[KB] Directory not found: %s", self.root)
-            return
+        loaded_files = 0
+        seen_documents: set[tuple[str, str]] = set()
+        for root in self.roots:
+            if not root.is_dir():
+                logger.warning("[KB] Directory not found: %s", root)
+                continue
 
-        files = sorted(
-            path for path in self.root.rglob("*")
-            if path.is_file() and not path.name.startswith(".")
-        )
-        for path in files:
-            try:
-                text = path.read_text(encoding="utf-8", errors="ignore").strip()
-            except OSError as exc:
-                logger.warning("[KB] Cannot read %s: %s", path, exc)
-                continue
-            if not text:
-                continue
-            title = str(path.relative_to(self.root).with_suffix(""))
-            source_scope = title.split("/", 1)[0]
-            scope = self._canonical_scope(title)
-            self.documents.append(KnowledgeDocument(scope, title, text))
-            title_terms = frozenset(_terms(title))
-            self.scope_terms.setdefault(scope, frozenset(_terms(scope)))
-            if source_scope in _PRIORITY_QA_SCOPES:
-                self.qa_entries.extend(self._parse_qa_entries(scope, title, text))
-            for chunk_text in _split_chunks(text):
-                term_counts = _terms(chunk_text)
-                searchable_terms = set(term_counts) | set(title_terms)
-                self.chunks.append(
-                    _Chunk(scope, title, chunk_text, term_counts, title_terms)
-                )
-                for term in searchable_terms:
-                    self.document_frequency[term] = (
-                        self.document_frequency.get(term, 0) + 1
+            files = sorted(
+                path for path in root.rglob("*")
+                if path.is_file() and not path.name.startswith(".")
+            )
+            for path in files:
+                try:
+                    text = path.read_text(encoding="utf-8", errors="ignore").strip()
+                except OSError as exc:
+                    logger.warning("[KB] Cannot read %s: %s", path, exc)
+                    continue
+                if not text:
+                    continue
+                title = path.relative_to(root).with_suffix("").as_posix()
+                document_key = (title, text)
+                if document_key in seen_documents:
+                    continue
+                seen_documents.add(document_key)
+                loaded_files += 1
+
+                source_scope = title.split("/", 1)[0]
+                scope = self._canonical_scope(title)
+                self.documents.append(KnowledgeDocument(scope, title, text))
+                title_terms = frozenset(_terms(title))
+                self.scope_terms.setdefault(scope, frozenset(_terms(scope)))
+                if source_scope in _PRIORITY_QA_SCOPES:
+                    self.qa_entries.extend(self._parse_qa_entries(scope, title, text))
+                for chunk_text in _split_chunks(text):
+                    term_counts = _terms(chunk_text)
+                    searchable_terms = set(term_counts) | set(title_terms)
+                    self.chunks.append(
+                        _Chunk(scope, title, chunk_text, term_counts, title_terms)
                     )
+                    for term in searchable_terms:
+                        self.document_frequency[term] = (
+                            self.document_frequency.get(term, 0) + 1
+                        )
 
         for terms in self.scope_terms.values():
             for term in terms:
@@ -747,7 +774,8 @@ class KnowledgeBase:
 
         logger.info(
             "[KB] Loaded %d files into %d chunks and %d priority QA entries from %s",
-            len(files), len(self.chunks), len(self.qa_entries), self.root,
+            loaded_files, len(self.chunks), len(self.qa_entries),
+            ", ".join(str(root) for root in self.roots),
         )
 
     @staticmethod
@@ -809,6 +837,8 @@ class KnowledgeBase:
             return "casual_conversation"
         if _KB_META_QUERY_RE.search(normalized):
             return "knowledge_base_feedback"
+        if _COMPANY_PROFILE_QUERY_RE.search(normalized):
+            return "strategy_profile"
         return ""
 
     def _select_scopes(self, query_terms: set[str]) -> set[str]:
@@ -919,14 +949,29 @@ class KnowledgeBase:
     ) -> KnowledgeSearchResult:
         """Search and attach every document in the selected product scope."""
         result = self.search(query, top_k=top_k)
-        if result.skipped_reason in {"empty_query", "casual_conversation", "knowledge_base_feedback"}:
+        if result.skipped_reason in {
+            "empty_query",
+            "casual_conversation",
+            "knowledge_base_feedback",
+            "strategy_profile",
+        }:
             return result
 
         scope = self._resolve_scope(query, result, preferred_scope=preferred_scope)
         if not scope:
             return result
 
-        scoped_documents = [doc for doc in self.documents if doc.scope == scope]
+        shared_matches = tuple(
+            match
+            for match in result.matches
+            if self._canonical_scope(match.title) not in _PRIORITY_QA_SCOPES
+        )
+        shared_titles = {match.title for match in shared_matches}
+        scoped_documents = [
+            doc
+            for doc in self.documents
+            if doc.scope == scope or doc.title in shared_titles
+        ]
         scoped_documents.sort(
             key=lambda doc: (
                 0 if doc.title.split("/", 1)[0] == scope else 1,
@@ -936,7 +981,10 @@ class KnowledgeBase:
         scoped_matches = tuple(
             match
             for match in result.matches
-            if self._canonical_scope(match.title) == scope
+            if (
+                self._canonical_scope(match.title) == scope
+                or match.title in shared_titles
+            )
         )
         return replace(
             result,
@@ -1325,12 +1373,40 @@ _kb: KnowledgeBase | None = None
 _kb_lock = threading.Lock()
 
 
+def _configured_knowledge_roots() -> tuple[Path, ...]:
+    roots: list[Path] = []
+    root_value = os.getenv("KNOWLEDGE_BASE_DIR", "").strip()
+    if root_value:
+        roots.append(Path(root_value).expanduser().resolve())
+    if (
+        _BUNDLED_KNOWLEDGE_ROOT.is_dir()
+        and any(path.is_file() for path in _BUNDLED_KNOWLEDGE_ROOT.rglob("*"))
+    ):
+        bundled_root = _BUNDLED_KNOWLEDGE_ROOT.resolve()
+        if bundled_root not in roots:
+            roots.append(bundled_root)
+    ai_sales_product_root = configured_ai_sales_product_root()
+    if ai_sales_product_root.is_dir() and ai_sales_product_root not in roots:
+        roots.append(ai_sales_product_root)
+    return tuple(roots)
+
+
+def _get_configured_knowledge_base() -> KnowledgeBase | None:
+    global _kb
+    roots = _configured_knowledge_roots()
+    if not roots:
+        return None
+    with _kb_lock:
+        if _kb is None or _kb.roots != roots:
+            _kb = KnowledgeBase(roots[0], additional_roots=roots[1:])
+        return _kb
+
+
 def search_knowledge(query: str, preferred_scope: str = "") -> KnowledgeSearchResult:
     """Search the configured local knowledge base and log auditable hits."""
-    global _kb
     start = time.perf_counter()
-    root_value = os.getenv("KNOWLEDGE_BASE_DIR", "").strip()
-    if not root_value:
+    knowledge_base = _get_configured_knowledge_base()
+    if knowledge_base is None:
         result = KnowledgeSearchResult(
             query=query,
             matches=(),
@@ -1338,11 +1414,6 @@ def search_knowledge(query: str, preferred_scope: str = "") -> KnowledgeSearchRe
         )
         logger.info("[KB] skipped reason=%s query=%r", result.skipped_reason, query)
         return result
-
-    with _kb_lock:
-        if _kb is None or str(_kb.root) != root_value:
-            _kb = KnowledgeBase(Path(root_value).expanduser())
-        knowledge_base = _kb
 
     try:
         top_k = max(1, int(os.getenv("KB_TOP_K", "4")))
@@ -1377,14 +1448,9 @@ def search_knowledge(query: str, preferred_scope: str = "") -> KnowledgeSearchRe
 
 def warm_knowledge_base() -> None:
     """Load the configured QA files and semantic index before serving users."""
-    global _kb
-    root_value = os.getenv("KNOWLEDGE_BASE_DIR", "").strip()
-    if not root_value:
+    knowledge_base = _get_configured_knowledge_base()
+    if knowledge_base is None:
         return
-    with _kb_lock:
-        if _kb is None or str(_kb.root) != root_value:
-            _kb = KnowledgeBase(Path(root_value).expanduser())
-        knowledge_base = _kb
     knowledge_base.warm()
 
 
