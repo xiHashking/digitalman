@@ -47,7 +47,7 @@ avatar.example.com {
 可以通过地址参数指定形象和参考音频：
 
 ```text
-/tablet.html?avatar=wav2lip256_avatar1&refaudio=zh-CN-YunxiaNeural
+/tablet.html?avatar=wav2lip_business_consultant_v1&refaudio=zh-CN-XiaoxiaoNeural
 ```
 
 跨公网部署且 WebRTC 无法建立时，可以先用以下地址验证 STUN：

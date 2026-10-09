@@ -10,7 +10,7 @@ r: 10
 
 # -------- Avatar Model ----------------------------------------------------------
 model: wav2lip                 # musetalk / wav2lip / ultralight
-avatar_id: wav2lip256_avatar1
+avatar_id: wav2lip_business_consultant_v1
 batch_size: 16
 
 # -------- Custom Actions ----------------------------------------------------------
@@ -18,7 +18,7 @@ customvideo_config: ''
 
 # -------- TTS ----------------------------------------------------------
 tts: edgetts                   # edgetts / gpt-sovits / cosyvoice / fishtts / tencent / doubao / indextts2 / azuretts / qwentts
-REF_FILE: ''                   # voice name or reference audio file path (wav, 16kHz, mono)
+REF_FILE: 'zh-CN-XiaoxiaoNeural' # mature, warm business-style female Edge TTS voice
 REF_TEXT: ''                   # reference text for voice cloning (English or Chinese)
 TTS_SERVER: ''                 # TTS server URL, no trailing slash
 
