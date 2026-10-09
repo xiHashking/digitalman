@@ -38,6 +38,7 @@ import asyncio
 from av import AudioFrame, VideoFrame
 from avatars.wav2lip.models import Wav2Lip
 from avatars.base_avatar import BaseAvatar
+from avatars.lip_blend import blend_mouth_region
 
 from tqdm import tqdm
 from utils.logger import logger
@@ -109,6 +110,9 @@ class LipReal(BaseAvatar):
         self.model = model
 
         self.frame_list_cycle,self.face_list_cycle,self.coord_list_cycle = avatar
+        self.lip_blend_strength = float(
+            np.clip(getattr(opt, 'wav2lip_blend_strength', 1.0), 0.0, 1.0)
+        )
 
         self.asr = MelASR(opt,self)
         self.asr.warm_up()
@@ -143,6 +147,10 @@ class LipReal(BaseAvatar):
         combine_frame = self.frame_list_cycle[idx].copy()
         y1, y2, x1, x2 = bbox
         res_frame = cv2.resize(pred_frame.astype(np.uint8),(x2-x1,y2-y1))
-        combine_frame[y1:y2, x1:x2] = res_frame
+        original_face = combine_frame[y1:y2, x1:x2]
+        combine_frame[y1:y2, x1:x2] = blend_mouth_region(
+            original_face,
+            res_frame,
+            self.lip_blend_strength,
+        )
         return combine_frame
-

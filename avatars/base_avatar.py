@@ -468,7 +468,10 @@ class BaseAvatar:
                 else:
                     combine_frame = current_frame
 
-            cv2.putText(combine_frame, "LiveTalking", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128,128,128), 1)
+            watermark_text = getattr(self.opt, 'video_watermark_text', '')
+            if watermark_text:
+                cv2.putText(combine_frame, watermark_text, (10, 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128, 128, 128), 1)
             
             # 使用统一输出接口推送视频帧
             self.output.push_video_frame(combine_frame)

@@ -47,8 +47,19 @@ avatar.example.com {
 可以通过地址参数指定形象和参考音频：
 
 ```text
-/tablet.html?avatar=wav2lip_business_consultant_v1&refaudio=zh-CN-XiaoxiaoNeural
+/tablet.html?avatar=wav2lip_business_consultant_v2&refaudio=zh-CN-XiaoxiaoNeural
 ```
+
+`data/` 不纳入 Git。新环境首次部署时，可通过已提交的睁眼、闭眼源图重新生成商务角色：
+
+```bash
+.venv/bin/python scripts/build_blink_avatar.py
+.venv/bin/python -m avatars.wav2lip.genavatar \
+  --video_path data/avatar_sources/business_consultant_v2.mp4 \
+  --avatar_id wav2lip_business_consultant_v2
+```
+
+口型幅度由 `config.yaml` 的 `wav2lip_blend_strength` 控制；当前 `0.45` 为轻微开合，数值越大动作越明显。
 
 跨公网部署且 WebRTC 无法建立时，可以先用以下地址验证 STUN：
 

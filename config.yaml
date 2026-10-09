@@ -10,8 +10,10 @@ r: 10
 
 # -------- Avatar Model ----------------------------------------------------------
 model: wav2lip                 # musetalk / wav2lip / ultralight
-avatar_id: wav2lip_business_consultant_v1
+avatar_id: wav2lip_business_consultant_v2
 batch_size: 16
+wav2lip_blend_strength: 0.45 # subtle lower-face motion; upper face remains unchanged
+video_watermark_text: ''     # keep the tablet presentation clean
 
 # -------- Custom Actions ----------------------------------------------------------
 customvideo_config: ''

@@ -16,7 +16,7 @@ def osmakedirs(path_list):
     for path in path_list:
         os.makedirs(path) if not os.path.exists(path) else None
 
-def video2imgs(vid_path, save_path, ext = '.png',cut_frame = 10000000):
+def video2imgs(vid_path, save_path, ext='.png', cut_frame=10000000, watermark_text=''):
     cap = cv2.VideoCapture(vid_path)
     count = 0
     while True:
@@ -24,7 +24,9 @@ def video2imgs(vid_path, save_path, ext = '.png',cut_frame = 10000000):
             break
         ret, frame = cap.read()
         if ret:
-            cv2.putText(frame, "LiveTalking", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128,128,128), 1)
+            if watermark_text:
+                cv2.putText(frame, watermark_text, (10, 20), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.3, (128, 128, 128), 1)
             cv2.imwrite(f"{save_path}/{count:08d}.png", frame)
             count += 1
         else:
@@ -47,7 +49,9 @@ def get_smoothened_boxes(boxes, T):
 		boxes[i] = np.mean(window, axis=0)
 	return boxes
 
-def generate_avatar(video_path, avatar_id, save_path='./data/avatars', img_size=96, pads=[0, 10, 0, 0], nosmooth=False, face_det_batch_size=16, progress_callback=None):
+def generate_avatar(video_path, avatar_id, save_path='./data/avatars', img_size=256,
+                    pads=[0, 10, 0, 0], nosmooth=False, face_det_batch_size=16,
+                    progress_callback=None, watermark_text=''):
     """
     生成avatar的核心逻辑
 
@@ -71,7 +75,7 @@ def generate_avatar(video_path, avatar_id, save_path='./data/avatars', img_size=
     if progress_callback: progress_callback(5)
 
     print(f"正在处理视频: {video_path}")
-    video2imgs(video_path, full_imgs_path, ext='png')
+    video2imgs(video_path, full_imgs_path, ext='png', watermark_text=watermark_text)
 
     if progress_callback: progress_callback(20)
 
@@ -143,7 +147,7 @@ def generate_avatar(video_path, avatar_id, save_path='./data/avatars', img_size=
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Inference code to lip-sync videos in the wild using Wav2Lip models')
-    parser.add_argument('--img_size', default=96, type=int)
+    parser.add_argument('--img_size', default=256, type=int)
     parser.add_argument('--avatar_id', default='wav2lip_avatar1', type=str)
     parser.add_argument('--save_path', default='data/avatars', type=str)
     parser.add_argument('--video_path', default='', type=str)
@@ -153,6 +157,8 @@ if __name__ == '__main__':
                         help='Padding (top, bottom, left, right). Please adjust to include chin at least')
     parser.add_argument('--face_det_batch_size', type=int,
                         help='Batch size for face detection', default=16)
+    parser.add_argument('--watermark_text', type=str, default='',
+                        help='Optional text watermark added to generated frames')
     args = parser.parse_args()
 
     generate_avatar(
@@ -162,5 +168,6 @@ if __name__ == '__main__':
         img_size=args.img_size,
         pads=args.pads,
         nosmooth=args.nosmooth,
-        face_det_batch_size=args.face_det_batch_size
+        face_det_batch_size=args.face_det_batch_size,
+        watermark_text=args.watermark_text,
     )

@@ -65,6 +65,10 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=16, help="infer batch")
     parser.add_argument('--modelres', type=int, default=192)
     parser.add_argument('--modelfile', type=str, default='')
+    parser.add_argument('--wav2lip_blend_strength', type=float, default=1.0,
+                        help='Wav2Lip mouth-region blend strength (0.0-1.0)')
+    parser.add_argument('--video_watermark_text', type=str, default='',
+                        help='Optional text watermark rendered on output video')
 
     # ─── 自定义动作和多形象 ────────────────────────────────────────────
     parser.add_argument('--customvideo_config', type=str, default='',
