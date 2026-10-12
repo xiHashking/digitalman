@@ -80,6 +80,9 @@ flutter:
     - assets/models/chitose/chitose.2048/
     - assets/models/chitose/motion/
     - assets/models/chitose/expressions/
+    - assets/models/shizuku/
+    - assets/models/shizuku/shizuku.1024/
+    - assets/models/shizuku/motion/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

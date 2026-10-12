@@ -35,6 +35,12 @@ enum _AvatarMode {
     '校服男生 · 本地 Live2D',
     modelDir: 'chitose',
     modelFile: 'chitose.model3.json',
+  ),
+  shizuku(
+    'Shizuku',
+    '课桌女生 · 本地 Live2D',
+    modelDir: 'shizuku',
+    modelFile: 'shizuku.model3.json',
   );
 
   const _AvatarMode(

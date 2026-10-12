@@ -17,8 +17,6 @@ Existing realistic business avatar and Haru receptionist remain available.
 - Intended preview: school-oriented conversations, not an adult business identity.
 - Repository LICENSE.md is bundled beside the model.
 
-## Licensing requirements
-
 ## Chitose
 
 - Official download: https://cubism.live2d.com/sample-data/bin/chitose/chitose_ja.zip
@@ -26,7 +24,14 @@ Existing realistic business avatar and Haru receptionist remain available.
 - Intended preview: school-uniform student; no fantasy costume.
 - Mouth animation uses the model's declared PARAM_MOUTH_OPEN_Y lip-sync ID.
 
-## Commercial release checks
+## Shizuku
+
+- Official download: https://cubism.live2d.com/sample-data/bin/shizuku/shizuku_ja.zip
+- Only runtime assets and original ReadMe.txt are included, unmodified.
+- Intended preview: schoolgirl sitting at a desk, for an education context.
+- Character name/settings must remain unchanged per official individual terms.
+
+## Licensing requirements
 
 Official sample terms: https://www.live2d.com/eula/live2d-sample-model-terms_en.html
 Free Material License: https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html
