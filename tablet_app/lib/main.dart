@@ -23,6 +23,12 @@ enum _AvatarMode {
     '科技咨询 · 本地 Live2D',
     modelDir: 'ren',
     modelFile: 'Ren.model3.json',
+  ),
+  hiyori(
+    'Hiyori Momose',
+    '校园交流 · 本地 Live2D',
+    modelDir: 'hiyori',
+    modelFile: 'Hiyori.model3.json',
   );
 
   const _AvatarMode(

@@ -14,9 +14,13 @@ void main() {
       final data = jsonDecode(model.readAsStringSync()) as Map<String, dynamic>;
       final refs = data['FileReferences'] as Map<String, dynamic>;
       void check(String name) {
-        expect(File('${model.parent.path}/$name').existsSync(), isTrue,
-            reason: '${model.path}: missing $name');
+        expect(
+          File('${model.parent.path}/$name').existsSync(),
+          isTrue,
+          reason: '${model.path}: missing $name',
+        );
       }
+
       for (final key in ['Moc', 'Physics', 'Pose', 'DisplayInfo', 'UserData']) {
         if (refs[key] != null) check(refs[key] as String);
       }

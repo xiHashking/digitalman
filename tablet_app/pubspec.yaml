@@ -73,6 +73,9 @@ flutter:
     - assets/models/ren/Ren.2048/
     - assets/models/ren/motions/
     - assets/models/ren/expressions/
+    - assets/models/hiyori/
+    - assets/models/hiyori/Hiyori.2048/
+    - assets/models/hiyori/motions/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

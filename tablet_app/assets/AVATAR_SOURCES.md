@@ -10,7 +10,14 @@ Existing realistic business avatar and Haru receptionist remain available.
 - Intended preview: technology consultation; not a formal business spokesperson.
 - Original repository LICENSE.md is bundled beside the model.
 
-## Licensing
+## Hiyori Momose
+
+- Same official repository and commit as Ren; Samples/Resources/Hiyori.
+- Original model is unmodified; character design changes are prohibited.
+- Intended preview: school-oriented conversations, not an adult business identity.
+- Repository LICENSE.md is bundled beside the model.
+
+## Licensing requirements
 
 Official sample terms: https://www.live2d.com/eula/live2d-sample-model-terms_en.html
 Free Material License: https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html
