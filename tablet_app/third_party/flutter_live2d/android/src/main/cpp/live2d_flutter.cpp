@@ -88,6 +88,24 @@ static void ConfigureRendererForStability(Live2DModel* model)
     renderer->UseHighPrecisionMask(false);
 }
 
+static void FitModelToView(Live2DView* view)
+{
+    if (!view || !view->model || !view->model->IsLoaded() ||
+        view->width <= 0 || view->height <= 0) return;
+    auto* model = view->model->GetModel();
+    const float canvasWidth = model->GetCanvasWidth();
+    const float canvasHeight = model->GetCanvasHeight();
+    if (canvasWidth <= 0.0f || canvasHeight <= 0.0f) return;
+    // Projection preserves aspect ratio. Fit BOTH canvas dimensions, rather
+    // than always fitting width in portrait (which crops tall Haru's head).
+    const float aspect = static_cast<float>(view->width) / view->height;
+    const float visibleWidth = aspect > 1.0f ? 2.0f * aspect : 2.0f;
+    const float visibleHeight = aspect > 1.0f ? 2.0f : 2.0f / aspect;
+    const float heightLimitedWidth = visibleHeight * canvasWidth / canvasHeight;
+    view->model->GetModelMatrix()->SetWidth(
+        (visibleWidth < heightLimitedWidth ? visibleWidth : heightLimitedWidth) * 0.94f);
+}
+
 static bool ReloadModelInternal(Live2DView* view, const char* dir, const char* file)
 {
     if (!view || !dir || !file) return false;
@@ -114,10 +132,7 @@ static bool ReloadModelInternal(Live2DView* view, const char* dir, const char* f
     }
     ConfigureRendererForStability(view->model);
     view->model->SetupTextures();
-    if (view->width > view->height)
-        view->model->GetModelMatrix()->SetHeight(2.0f);
-    else
-        view->model->GetModelMatrix()->SetWidth(2.0f);
+    FitModelToView(view);
 
     __android_log_print(ANDROID_LOG_INFO, "flutter_live2d", "model loaded");
     return true;
@@ -233,10 +248,7 @@ Java_com_linh18nd_flutter_1live2d_Live2DBridge_nativeOnSurfaceChanged(JNIEnv*, j
 
     if (view->model && view->model->IsLoaded())
     {
-        if (view->width > view->height)
-            view->model->GetModelMatrix()->SetHeight(2.0f);
-        else
-            view->model->GetModelMatrix()->SetWidth(2.0f);
+        FitModelToView(view);
     }
 }
 
