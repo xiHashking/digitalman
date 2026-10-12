@@ -28,6 +28,8 @@ models/
 !tablet_app/assets/models/ren/**
 !tablet_app/assets/models/hiyori/
 !tablet_app/assets/models/hiyori/**
+!tablet_app/assets/models/chitose/
+!tablet_app/assets/models/chitose/**
 *.log
 dist
 

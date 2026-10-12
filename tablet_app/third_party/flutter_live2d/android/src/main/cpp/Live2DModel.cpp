@@ -253,9 +253,19 @@ void Live2DModel::Update()
     // physics and pose updates. Otherwise Cubism's LoadParameters/motion pass
     // overwrites ParamMouthOpenY before the model is drawn.
     if (_hasMouthOverride)
+    {
+        // Older official school models use PARAM_MOUTH_OPEN_Y instead of
+        // ParamMouthOpenY. Use their declared LipSync IDs, not a guessed name.
+        if (_lipSyncIds.GetSize() > 0)
+        {
+            for (csmInt32 i = 0; i < _lipSyncIds.GetSize(); ++i)
+                _model->SetParameterValue(_lipSyncIds[i], _mouthOpenY);
+        }
+        else
         _model->SetParameterValue(
             CubismFramework::GetIdManager()->GetId("ParamMouthOpenY"),
             _mouthOpenY);
+    }
 
     _model->Update();
 }

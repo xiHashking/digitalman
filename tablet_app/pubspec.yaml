@@ -76,6 +76,10 @@ flutter:
     - assets/models/hiyori/
     - assets/models/hiyori/Hiyori.2048/
     - assets/models/hiyori/motions/
+    - assets/models/chitose/
+    - assets/models/chitose/chitose.2048/
+    - assets/models/chitose/motion/
+    - assets/models/chitose/expressions/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

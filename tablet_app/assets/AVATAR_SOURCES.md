@@ -19,6 +19,15 @@ Existing realistic business avatar and Haru receptionist remain available.
 
 ## Licensing requirements
 
+## Chitose
+
+- Official download: https://cubism.live2d.com/sample-data/bin/chitose/chitose_ja.zip
+- Only runtime assets and original Readme.txt are included, unmodified.
+- Intended preview: school-uniform student; no fantasy costume.
+- Mouth animation uses the model's declared PARAM_MOUTH_OPEN_Y lip-sync ID.
+
+## Commercial release checks
+
 Official sample terms: https://www.live2d.com/eula/live2d-sample-model-terms_en.html
 Free Material License: https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html
 SDK release license: https://www.live2d.com/en/download/cubism-sdk/release-license/
