@@ -31,7 +31,23 @@ Existing realistic business avatar and Haru receptionist remain available.
 - Intended preview: schoolgirl sitting at a desk, for an education context.
 - Character name/settings must remain unchanged per official individual terms.
 
-## Licensing requirements
+## Hibiki
+
+- Official download: https://cubism.live2d.com/sample-data/bin/hibiki/hibiki_ja.zip
+- Runtime assets and original ReadMe.txt included.
+- Preview purpose: approachable school-uniform student.
+- Model settings add explicit legacy blink and lip-sync IDs for this app.
+- The app does not play bundled Japanese sample audio; conversation still uses
+  the existing backend voice and knowledge pipeline.
+
+## ChoDenpa (not bundled)
+
+- Candidate: https://booth.pm/ja/items/4145407
+- Download requires BOOTH login; author requires following their account.
+- Await user-provided archive and confirmation of those requirements. Commercial
+  app distribution rights must be clarified before bundling in a release.
+
+## License links
 
 Official sample terms: https://www.live2d.com/eula/live2d-sample-model-terms_en.html
 Free Material License: https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html

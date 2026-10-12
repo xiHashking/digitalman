@@ -32,6 +32,8 @@ models/
 !tablet_app/assets/models/chitose/**
 !tablet_app/assets/models/shizuku/
 !tablet_app/assets/models/shizuku/**
+!tablet_app/assets/models/hibiki/
+!tablet_app/assets/models/hibiki/**
 *.log
 dist
 

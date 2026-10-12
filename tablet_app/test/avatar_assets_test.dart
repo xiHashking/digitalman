@@ -9,8 +9,8 @@ void main() {
         .listSync(recursive: true)
         .whereType<File>()
         .where((file) => file.path.endsWith('.model3.json'));
-    // Five local Live2D models plus the server's real-video avatar = six.
-    expect(models.length, 5);
+    // Six local Live2D models plus the server's real-video avatar = seven.
+    expect(models.length, 6);
     for (final model in models) {
       final data = jsonDecode(model.readAsStringSync()) as Map<String, dynamic>;
       final refs = data['FileReferences'] as Map<String, dynamic>;

@@ -83,6 +83,11 @@ flutter:
     - assets/models/shizuku/
     - assets/models/shizuku/shizuku.1024/
     - assets/models/shizuku/motion/
+    - assets/models/hibiki/
+    - assets/models/hibiki/hibiki.2048/
+    - assets/models/hibiki/motion/
+    - assets/models/hibiki/expressions/
+    - assets/models/hibiki/sounds/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

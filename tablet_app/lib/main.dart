@@ -41,6 +41,12 @@ enum _AvatarMode {
     '课桌女生 · 本地 Live2D',
     modelDir: 'shizuku',
     modelFile: 'shizuku.model3.json',
+  ),
+  hibiki(
+    'Hibiki 校园女生',
+    '活泼学生 · 本地 Live2D',
+    modelDir: 'hibiki',
+    modelFile: 'hibiki.model3.json',
   );
 
   const _AvatarMode(
