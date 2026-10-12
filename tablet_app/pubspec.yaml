@@ -69,6 +69,10 @@ flutter:
     - assets/models/haru_greeter/
     - assets/models/haru_greeter/haru_greeter_t05.2048/
     - assets/models/haru_greeter/motion/
+    - assets/models/ren/
+    - assets/models/ren/Ren.2048/
+    - assets/models/ren/motions/
+    - assets/models/ren/expressions/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

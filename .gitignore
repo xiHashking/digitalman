@@ -24,6 +24,8 @@ models/
 !tablet_app/assets/models/
 !tablet_app/assets/models/haru_greeter/
 !tablet_app/assets/models/haru_greeter/**
+!tablet_app/assets/models/ren/
+!tablet_app/assets/models/ren/**
 *.log
 dist
 
