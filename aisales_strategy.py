@@ -9,6 +9,8 @@ from pathlib import Path
 
 import yaml
 
+from prompt_sources import local_product_root, local_strategy_root, prompt_body
+
 
 _DEFAULT_STRATEGY_NAME = "ai_sales_education"
 _CORE_MAIN_SECTIONS = (
@@ -135,12 +137,18 @@ def _selected_skill_names(question: str) -> set[str]:
 
 
 def load_ai_sales_strategy(question: str) -> AiSalesStrategyBundle | None:
-    """Load the stable persona plus only the sales skills relevant to one question."""
-    worktree = configured_ai_sales_worktree()
+    """Load the local editable strategy, with AiSales as an explicit fallback."""
     strategy_name = configured_ai_sales_strategy_name()
-    strategy_root = (worktree / strategy_name).resolve()
+    explicit_worktree = os.getenv("AISALES_PROMPT_WORKTREE", "").strip()
+    local_root = local_strategy_root()
+    if not explicit_worktree and (local_root / "prompt_assembly.yaml").is_file():
+        strategy_root = local_root
+        product_root = local_product_root()
+    else:
+        worktree = configured_ai_sales_worktree()
+        strategy_root = (worktree / strategy_name).resolve()
+        product_root = configured_ai_sales_product_root()
     assembly_path = strategy_root / "prompt_assembly.yaml"
-    product_root = configured_ai_sales_product_root()
     if not assembly_path.is_file() or not product_root.is_dir():
         return None
 
@@ -189,6 +197,20 @@ def load_ai_sales_strategy(question: str) -> AiSalesStrategyBundle | None:
                 text=skill_path.read_text(encoding="utf-8").strip(),
             )
         )
+
+    # Company background and answer boundaries are maintained as editable
+    # documents beside the strategy. Keep them in the same per-question
+    # bundle so the knowledge agent can ground company answers with evidence.
+    if strategy_root == local_root:
+        for filename in ("03_company_background.md", "04_answer_boundaries.md"):
+            text = prompt_body(filename)
+            if text:
+                documents.append(
+                    AiSalesPromptDocument(
+                        title=f"可编辑提示词/{filename}",
+                        text=text,
+                    )
+                )
 
     return AiSalesStrategyBundle(
         strategy_name=strategy_name,

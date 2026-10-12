@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from knowledge_base import KnowledgeDocument, KnowledgeSearchResult
+from prompt_sources import prompt_body
 
 
 _POLICY_DOCUMENT_PATH = "系统政策/AI素养评价产品定位与能力边界"
@@ -163,6 +164,7 @@ def _build_system_prompt(
     strategy_documents: tuple[KnowledgeDocument, ...],
 ) -> str:
     documents_content = result.context(max_chars=max_context_chars)
+    editable_agent_prompt = prompt_body("01_knowledge_qa_agent_prompt.md")
     strategy_content = "\n\n".join(
         f"文档路径：{document.title}\n原文：\n{document.text}"
         for document in strategy_documents
@@ -180,6 +182,12 @@ def _build_system_prompt(
             f"文档路径：{_POLICY_DOCUMENT_PATH}\n"
             f"原文：\n{policy_text}"
         )
+    editable_rules = ""
+    if editable_agent_prompt:
+        editable_rules = (
+            "\n\n【可编辑的知识库问答规则】\n"
+            f"{editable_agent_prompt}"
+        )
     return f"""你是曹老师数字员工的单轮知识问答 Agent。你只能依据下方策略口径和检索资料回答，不能使用常识补充业务事实。
 
 工作规则：
@@ -194,6 +202,7 @@ def _build_system_prompt(
 9. evidence 最多三条，每条必须包含 source 和 quote；source 必须使用给定文档路径，quote 必须是文档中的逐字原文。
 10. gaps 是资料无法回答或仍需确认的事项数组，没有缺口时返回空数组。
 11. 仅输出 JSON 对象，字段严格为 answer、evidence、gaps，不要输出其他文字。
+{editable_rules}
 
 当前产品范围：{result.scope}
 {strategy_document}
