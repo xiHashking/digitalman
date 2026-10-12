@@ -5,11 +5,31 @@ import numpy as np
 import resampy
 import soundfile as sf
 import edge_tts
+import edge_tts.communicate as edge_tts_communicate
+from edge_tts.constants import TRUSTED_CLIENT_TOKEN
 from io import BytesIO
 
 from utils.logger import logger
 from .base_tts import BaseTTS, State
 from registry import register
+
+
+# Microsoft moved Edge's synthesis WebSocket off speech.platform.bing.com in
+# October 2026.  edge-tts 7.2.8 still points at the legacy host, which now
+# returns HTTP 403 for otherwise valid requests.  Keep the endpoint local to
+# this integration so upgrading the dependency does not require editing the
+# virtualenv.  EDGE_TTS_WSS_URL can be used to override it for a future API
+# change or an internal proxy.
+_DEFAULT_WSS_URL = (
+    "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1"
+    f"?Ocp-Apim-Subscription-Key={TRUSTED_CLIENT_TOKEN}"
+)
+
+
+def _configure_edge_tts_endpoint() -> None:
+    endpoint = os.getenv("EDGE_TTS_WSS_URL", _DEFAULT_WSS_URL).strip()
+    if endpoint:
+        edge_tts_communicate.WSS_URL = endpoint
 
 @register("tts", "edgetts")
 class EdgeTTS(BaseTTS):
@@ -81,6 +101,7 @@ class EdgeTTS(BaseTTS):
     
     async def __main(self,voicename: str, text: str) -> bool:
         try:
+            _configure_edge_tts_endpoint()
             communicate = edge_tts.Communicate(
                 text,
                 voicename,

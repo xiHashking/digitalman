@@ -51,6 +51,7 @@ class LiveTalkingController extends ChangeNotifier {
   bool _endingTurn = false;
   bool _micPaused = false;
   bool _started = false;
+  Future<void>? _rendererInitialization;
   int _connectionEpoch = 0;
   int _turnEpoch = 0;
 
@@ -73,10 +74,16 @@ class LiveTalkingController extends ChangeNotifier {
   bool get canInterrupt => isConnected && state != ConversationState.connecting;
 
   Future<void> initialize() async {
-    await videoRenderer.initialize();
+    // Initializing the WebRTC renderer can take several seconds on the
+    // tablet. It is only needed when the server video mode is used, so start
+    // it in parallel and let the UI become interactive immediately. Haru can
+    // then be selected while the renderer finishes warming up.
+    _rendererInitialization ??= videoRenderer.initialize().then((_) {
+      _rendererReady = true;
+      _notify();
+    });
     final preferences = await SharedPreferences.getInstance();
     _serverAddress = preferences.getString(_serverPreferenceKey) ?? '';
-    _rendererReady = true;
     _notify();
   }
 
@@ -111,6 +118,11 @@ class LiveTalkingController extends ChangeNotifier {
     _sessionId = null;
     _errorMessage = '';
     _setState(ConversationState.connecting, '连接数字人中');
+
+    // A real-video session needs the renderer to be ready before attaching
+    // the incoming WebRTC track. Haru mode does not call connect(), so this
+    // wait no longer blocks avatar selection during app startup.
+    await _rendererInitialization;
 
     await _stopConversationAudio(closeSocket: true);
     final oldConnection = _peerConnection;

@@ -20,6 +20,10 @@ workspace/log_ngp.txt
 .env
 .certs/
 models/
+# Bundled Live2D runtime assets for the Android tablet client.
+!tablet_app/assets/models/
+!tablet_app/assets/models/haru_greeter/
+!tablet_app/assets/models/haru_greeter/**
 *.log
 dist
 

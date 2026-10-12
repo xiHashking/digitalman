@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_live2d/flutter_live2d.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'livetalking_controller.dart';
+
+enum _AvatarMode { real, haru }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,14 +54,21 @@ class TabletConversationPage extends StatefulWidget {
 class _TabletConversationPageState extends State<TabletConversationPage>
     with WidgetsBindingObserver {
   late final LiveTalkingController _controller;
+  late final Live2DViewController _haruController;
   bool _initializing = true;
   bool _chromeVisible = false;
+  _AvatarMode _avatarMode = _AvatarMode.real;
+  bool _haruModelReady = false;
+  bool _haruLoading = false;
+  bool _mouthUpdateInFlight = false;
+  Timer? _haruMouthTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = LiveTalkingController();
+    _haruController = Live2DViewController();
     unawaited(_initialize());
   }
 
@@ -78,6 +89,8 @@ class _TabletConversationPageState extends State<TabletConversationPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _haruMouthTimer?.cancel();
+    _haruController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -98,6 +111,143 @@ class _TabletConversationPageState extends State<TabletConversationPage>
       if (!mounted || _controller.serverAddress.isEmpty) return;
     }
     await _controller.connect();
+  }
+
+  void _selectAvatarMode(_AvatarMode mode) {
+    if (mode == _avatarMode) return;
+    debugPrint('[Haru] avatar mode -> $mode');
+    setState(() => _avatarMode = mode);
+    if (mode == _AvatarMode.haru) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_loadHaruModel());
+      });
+    } else {
+      _haruMouthTimer?.cancel();
+      _haruMouthTimer = null;
+      // Removing Live2DView tears down its native surface. The model must be
+      // loaded again when Haru is selected later.
+      _haruModelReady = false;
+    }
+  }
+
+  Future<void> _loadHaruModel() async {
+    if (_haruModelReady || _haruLoading || !mounted) return;
+    setState(() => _haruLoading = true);
+    try {
+      debugPrint('[Haru] waiting for Live2D view attach');
+      await _haruController.whenAttached.timeout(const Duration(seconds: 8));
+      debugPrint('[Haru] view attached: ${_haruController.value}');
+      // The Android TextureView reports `attached` before its EGL surface has
+      // received the first size callback. The native plugin rejects a load
+      // while that size is still zero, so retry after the render thread has
+      // had a chance to initialize the surface.
+      var loaded = false;
+      for (var attempt = 1; attempt <= 8 && !loaded; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 180));
+        loaded = await _haruController.loadModel(
+          modelDir: 'assets/models/haru_greeter/',
+          modelFileName: 'haru_greeter_t05.model3.json',
+        );
+        debugPrint(
+          '[Haru] load attempt=$attempt result=$loaded state=${_haruController.value}',
+        );
+      }
+      if (!loaded) {
+        throw StateError('Haru 模型加载失败');
+      }
+      await _haruController.startMotion(group: '', index: 0, priority: 1);
+      if (mounted) {
+        setState(() => _haruModelReady = true);
+      } else {
+        _haruModelReady = true;
+      }
+      _startHaruMouthAnimation();
+    } on Live2DException catch (error) {
+      _showAvatarError('${error.code}: ${error.message}');
+    } catch (error) {
+      debugPrint('[Haru] load failed: $error');
+      _showAvatarError(error.toString());
+    } finally {
+      if (mounted) setState(() => _haruLoading = false);
+    }
+  }
+
+  void _startHaruMouthAnimation() {
+    _haruMouthTimer?.cancel();
+    var phase = 0.0;
+    _haruMouthTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
+      if (!_haruModelReady || !_haruController.value.isLoaded) return;
+      final speaking = _controller.state == ConversationState.speaking;
+      final value = speaking ? 0.08 + ((math.sin(phase) + 1) * 0.06) : 0.0;
+      phase += 0.85;
+      if (_mouthUpdateInFlight) return;
+      _mouthUpdateInFlight = true;
+      _haruController
+          .setParameter('ParamMouthOpenY', value)
+          .whenComplete(() => _mouthUpdateInFlight = false);
+    });
+  }
+
+  void _showAvatarError(String message) {
+    if (!mounted) return;
+    setState(() => _avatarMode = _AvatarMode.real);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Haru 暂时不可用：$message')));
+  }
+
+  Future<void> _showAvatarPicker() async {
+    final selected = await showDialog<_AvatarMode>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF11161D),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: const Text('选择数字人形象'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _avatarChoice(
+                dialogContext,
+                mode: _AvatarMode.real,
+                icon: Icons.person_outline_rounded,
+                title: '真人商务形象',
+                subtitle: '使用服务器返回的视频数字人',
+              ),
+              _avatarChoice(
+                dialogContext,
+                mode: _AvatarMode.haru,
+                icon: Icons.face_retouching_natural_rounded,
+                title: 'Haru 接待员（Live2D）',
+                subtitle: '在平板本地渲染，连接前也可以预览',
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected != null && mounted) {
+      _selectAvatarMode(selected);
+    }
+  }
+
+  Widget _avatarChoice(
+    BuildContext dialogContext, {
+    required _AvatarMode mode,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: mode == _avatarMode
+          ? const Icon(Icons.check_circle, color: Color(0xFF38D39F))
+          : null,
+      onTap: () => Navigator.of(dialogContext).pop(mode),
+    );
   }
 
   Future<void> _showSettings({bool reconnectAfterSave = true}) async {
@@ -176,18 +326,51 @@ class _TabletConversationPageState extends State<TabletConversationPage>
             fit: StackFit.expand,
             children: <Widget>[
               const ColoredBox(color: Color(0xFF090B0F)),
-              if (_controller.rendererReady)
+              if (_avatarMode == _AvatarMode.haru) ...[
+                Live2DView(controller: _haruController),
+                if (_haruLoading || !_haruModelReady)
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        const CircularProgressIndicator(strokeWidth: 2),
+                        const SizedBox(height: 14),
+                        Text(
+                          _haruLoading ? '正在加载 Live2D 形象…' : '准备 Live2D 形象…',
+                          style: const TextStyle(
+                            color: Color(0xFFB8C0CC),
+                            fontSize: 15,
+                          ),
+                        ),
+                        if (_haruLoading) ...[
+                          const SizedBox(height: 5),
+                          const Text(
+                            '首次加载需要初始化本地渲染资源，请稍候',
+                            style: TextStyle(
+                              color: Color(0xFF7F8998),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ] else if (_controller.rendererReady)
                 RTCVideoView(
                   _controller.videoRenderer,
                   objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
                 ),
               const _TopShade(),
               const _BottomShade(),
+              // Keep the start/error panel below the top controls. If this
+              // is the last Stack child it intercepts the avatar selector,
+              // making Haru impossible to select before connecting.
+              if (_avatarMode != _AvatarMode.haru &&
+                  (!_controller.started ||
+                      _controller.state == ConversationState.error))
+                _buildStartLayer(),
               _buildTopBar(),
               _buildBottomControls(),
-              if (!_controller.started ||
-                  _controller.state == ConversationState.error)
-                _buildStartLayer(),
             ],
           );
         },
@@ -208,6 +391,14 @@ class _TabletConversationPageState extends State<TabletConversationPage>
               label: _initializing ? '正在初始化' : _controller.statusText,
             ),
             const Spacer(),
+            _IconControl(
+              icon: _avatarMode == _AvatarMode.haru
+                  ? Icons.face_retouching_natural_rounded
+                  : Icons.person_outline_rounded,
+              tooltip: '选择数字人形象',
+              onPressed: _showAvatarPicker,
+            ),
+            const SizedBox(width: 4),
             _IconControl(
               icon: Icons.refresh_rounded,
               tooltip: '重新连接',
@@ -273,8 +464,12 @@ class _TabletConversationPageState extends State<TabletConversationPage>
 
   Widget _buildStartLayer() {
     final hasError = _controller.state == ConversationState.error;
+    final isHaru = _avatarMode == _AvatarMode.haru;
     return ColoredBox(
-      color: const Color(0xDD05070A),
+      // Keep the Live2D character visible while the server is being started.
+      // The real-video mode keeps the stronger scrim for readability, while
+      // Haru only needs a light scrim behind the start controls.
+      color: isHaru ? const Color(0x5505070A) : const Color(0xDD05070A),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
