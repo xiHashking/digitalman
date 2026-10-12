@@ -96,10 +96,10 @@ Linux CUDA 环境搭建参考: <https://zhuanlan.zhihu.com/p/674972886>
 python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1
 ```
 
-项目默认从相邻的 `org_worktrees/ai_sales_education` 读取 AiSales 的曹老师策略和 `products/ai_sales_education` 产品资料。可以通过 `AISALES_PROMPT_WORKTREE`、`AISALES_STRATEGY_NAME` 和 `AISALES_PRODUCT_NAME` 指定其他位置。若还要加载额外 Markdown/文本资料，将 `KNOWLEDGE_BASE_DIR` 指向外部目录；外部资料会和 AiSales 产品资料合并：
+项目的本地整理资料位于 `knowledge_sources/03_digital_employee_strategy` 和 `knowledge_sources/02_aisales_product_knowledge`。当前 `.env` 将知识检索指向 `02_aisales_product_knowledge`；AiSales 策略来源仍可通过 `AISALES_PROMPT_WORKTREE`、`AISALES_STRATEGY_NAME` 和 `AISALES_PRODUCT_NAME` 配置。不要再配置旧的 `01_cao_teacher_knowledge_base`。
 
 ```bash
-KNOWLEDGE_BASE_DIR=/path/to/knowledge-base python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1
+KNOWLEDGE_BASE_DIR=./knowledge_sources/02_aisales_product_knowledge python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1
 ```
 
 每次问答都独立加载曹老师的身份、公司口径和与本轮问题相关的销售技能，再检索本轮相关 QA 或文档片段，由知识 Agent 组织最终回复并校验逐字证据。系统不继承上一轮产品范围，也不使用对话记忆；知识 Agent 请求或校验失败时，才使用现有检索结果兜底。资料没有明确依据时不会自行承诺。

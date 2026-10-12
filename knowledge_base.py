@@ -1401,7 +1401,10 @@ def _configured_knowledge_roots() -> tuple[Path, ...]:
     roots: list[Path] = []
     root_value = os.getenv("KNOWLEDGE_BASE_DIR", "").strip()
     if root_value:
-        roots.append(Path(root_value).expanduser().resolve())
+        # An explicit directory is the authoritative knowledge source. Do not
+        # merge the legacy bundled or AiSales product directories into it:
+        # merging would reintroduce stale documents and internal SOP material.
+        return (Path(root_value).expanduser().resolve(),)
     if (
         _BUNDLED_KNOWLEDGE_ROOT.is_dir()
         and any(path.is_file() for path in _BUNDLED_KNOWLEDGE_ROOT.rglob("*"))
