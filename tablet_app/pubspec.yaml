@@ -66,6 +66,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/backgrounds/
     - assets/models/haru_greeter/
     - assets/models/haru_greeter/haru_greeter_t05.2048/
     - assets/models/haru_greeter/motion/

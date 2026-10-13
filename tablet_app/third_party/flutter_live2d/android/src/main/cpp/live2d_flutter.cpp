@@ -191,7 +191,7 @@ Java_com_linh18nd_flutter_1live2d_Live2DBridge_nativeOnSurfaceCreated(JNIEnv*, j
 
     view->surfaceNeedsInit = true;
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // GL textures and renderer are tied to the old context which is now gone.

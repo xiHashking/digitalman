@@ -393,6 +393,12 @@ class _TabletConversationPageState extends State<TabletConversationPage>
             children: <Widget>[
               const ColoredBox(color: Color(0xFF090B0F)),
               if (_avatarMode.isLive2D) ...[
+                Image.asset(
+                  'assets/backgrounds/classroom-daylight.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  excludeFromSemantics: true,
+                ),
                 Live2DView(controller: _haruController),
                 if (_haruLoading || !_haruModelReady)
                   Center(
