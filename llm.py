@@ -8,6 +8,7 @@ from utils.logger import logger
 from aisales_strategy import load_ai_sales_strategy
 from knowledge_base import KnowledgeDocument, search_knowledge
 from knowledge_qa_agent import answer_knowledge_question
+from prompt_sources import prompt_body, read_editable_prompt, reply_templates
 from tts.base_tts import sanitize_tts_text
 
 # Built-in LLM providers. Each exposes an OpenAI-compatible chat completions
@@ -25,7 +26,7 @@ LLM_PROVIDERS = {
     },
 }
 
-AI_LITERACY_PRODUCT_POLICY = """AI素养评价产品定位与能力边界（高优先级）
+_DEFAULT_AI_LITERACY_PRODUCT_POLICY = """AI素养评价产品定位与能力边界（高优先级）
 以下规则仅适用于四川乐途智学科技有限公司的AI素养评价系统，并且优先级高于检索资料中的普通描述。
 
 产品定位：这是一套面向中小学生综合素养评价的数字档案与成长导航系统。系统运用人工智能技术进行数据便捷录入及智能分析，将学生日常、零散、过程性的真实数据转化为清晰、可理解、可应用的成长信息，帮助老师落实育人评价工作，帮助学校校准育人方向，帮助学生认识自我，让家校社各方看见单个学生的成长过程，减少家校矛盾、降低家庭焦虑、改善亲子关系。
@@ -41,6 +42,19 @@ AI_LITERACY_PRODUCT_POLICY = """AI素养评价产品定位与能力边界（高�
 AI能力边界：AI可以辅助解析教师语音和文字。AI可以辅助识别学生及其表现。AI可以辅助匹配评价指标。AI可以生成评价反馈初稿。AI可以汇总评价数据。AI可以辅助生成成长报告。AI可以提供趋势分析和工作建议。AI不能判断学生行为背后的真实动机。AI不能脱离具体情境给学生下结论。AI不能自动决定学生优劣。AI不能用单一分数定义学生。AI不能未经教师或学校审核直接发布重要评价。AI不能代替学校作出教育管理决策。
 
 表达约束：对外介绍必须使用“AI辅助”“教师审核”“成长支持”“过程性证据”等准确表述，不得将系统描述为自动评分、自动评判学生、完全替代教师录入或自动替学校决策。涉及具体功能、数据接入、接口对接、部署周期、效果数字、报告范围或个性化开发时，必须以当前知识库资料为依据；资料没有明确依据时，只能回答“需要进一步确认”或“可以由团队评估”，不得自行承诺。"""
+
+AI_LITERACY_PRODUCT_POLICY = read_editable_prompt(
+    "02_ai_literacy_product_policy.md",
+    _DEFAULT_AI_LITERACY_PRODUCT_POLICY,
+)
+
+
+def _active_ai_literacy_policy() -> str:
+    """Read the editable policy for the current request."""
+    return read_editable_prompt(
+        "02_ai_literacy_product_policy.md",
+        AI_LITERACY_PRODUCT_POLICY,
+    )
 
 _AI_LITERACY_SCOPE_TERMS = (
     "ai素养评价",
@@ -232,68 +246,74 @@ def _normalize_asr_query(message: str) -> str:
 
 def _ai_literacy_boundary_answer(message: str) -> str:
     text = message or ""
+    templates = _active_reply_templates()
     if re.search(r"动机|故意", text):
-        return (
-            "不可以。AI不能判断学生行为背后的真实动机，只能整理具体情境中的"
-            "过程性证据，最终由教师审核判断。"
-        )
+        return templates["boundary_motive"]
     if re.search(r"分数|优劣|优秀|排名", text):
-        return (
-            "不可以。系统不能用单一分数定义或比较学生，而是依据过程性证据支持"
-            "多元评价和个性成长，结果由教师审核。"
-        )
+        return templates["boundary_score"]
     if re.search(r"审核|发布|家长看", text):
-        return (
-            "不可以。AI只能生成评价反馈初稿，重要评价必须经过教师或学校审核确认后，"
-            "才能发布或展示。"
-        )
+        return templates["boundary_review"]
     if re.search(r"录入|确认|代替|替代", text):
-        return (
-            "不能完全替代。AI可以辅助解析语音文字、关联学生和匹配指标，"
-            "但成长记录仍需教师审核确认。"
-        )
+        return templates["boundary_teacher"]
     if re.search(r"学校|管理|决策|决定", text):
-        return (
-            "不可以。AI只能提供趋势分析和工作建议，不能代替学校作出教育管理决策。"
-        )
+        return templates["boundary_decision"]
     if re.search(r"考(核)?(学生|孩子)|测试学生|专门考", text):
-        return (
-            "不是。AI素养评价用于整理学生德智体美劳的过程性证据并支持成长，"
-            "不是自动考核或给学生排名。"
-        )
-    return (
-        "不可以。AI只能辅助整理过程性证据和生成反馈初稿，重要评价必须由教师审核，"
-        "不能自动评判学生。"
-    )
+        return templates["boundary_exam"]
+    return templates["boundary_default"]
+
+
+_DEFAULT_REPLY_TEMPLATES = {
+    "annual_student_rate": 25,
+    "voice_chat": "可以，您直接说就行，我会用语音回答。",
+    "school_price": "学校版按每名学生每年{rate}元计算，{student_count}名学生约{annual_price}每年，由学校统一采购。",
+    "growth_report": "成长报告基于学生平时的过程性记录汇总生成，AI辅助整理数据和生成初稿，经教师审核确认后形成。",
+    "personal_indicator": "现有资料只明确学校版支持自定义评价指标，个人版能否修改没有明确说明，需要团队进一步确认。",
+    "unclear_speech": "抱歉，我没听清，请再说一遍。",
+    "unconfirmed_delivery": "现有资料不能确认这个周期，需要团队根据具体需求和接口范围评估后再答复，不能直接承诺。",
+    "material_send": "当前语音端不能直接发送PDF，产品资料入口需要在平板应用中单独配置。",
+    "personal_operation": "这是个人版小程序的具体操作问题，当前语音端不能提供可靠的页面步骤，需要由产品支持人员确认。",
+    "boundary_motive": "不可以。AI不能判断学生行为背后的真实动机，只能整理具体情境中的过程性证据，最终由教师审核判断。",
+    "boundary_score": "不可以。系统不能用单一分数定义或比较学生，而是依据过程性证据支持多元评价和个性成长，结果由教师审核。",
+    "boundary_review": "不可以。AI只能生成评价反馈初稿，重要评价必须经过教师或学校审核确认后，才能发布或展示。",
+    "boundary_teacher": "不能完全替代。AI可以辅助解析语音文字、关联学生和匹配指标，但成长记录仍需教师审核确认。",
+    "boundary_decision": "不可以。AI只能提供趋势分析和工作建议，不能代替学校作出教育管理决策。",
+    "boundary_exam": "不是。AI素养评价用于整理学生德智体美劳的过程性证据并支持成长，不是自动考核或给学生排名。",
+    "boundary_default": "不可以。AI只能辅助整理过程性证据和生成反馈初稿，重要评价必须由教师审核，不能自动评判学生。",
+}
+
+
+def _active_reply_templates() -> dict:
+    try:
+        return reply_templates()
+    except Exception as exc:
+        logger.warning("[PROMPT] invalid deterministic reply templates, using fallback: %s", exc)
+        return _DEFAULT_REPLY_TEMPLATES
 
 
 def _direct_guard_answer(message: str) -> str:
     compact = re.sub(r"\s+", "", message or "")
+    templates = _active_reply_templates()
     if _VOICE_CHAT_REQUEST_RE.search(compact):
-        return "可以，您直接说就行，我会用语音回答。"
+        return templates["voice_chat"]
     price_match = _SCHOOL_STUDENT_PRICE_RE.search(compact)
     if price_match:
         raw_count = price_match.group("count") or price_match.group("reverse_count")
         student_count = int(raw_count.replace(",", "").replace("，", ""))
-        annual_yuan = student_count * 25
+        rate = float(templates["annual_student_rate"])
+        annual_yuan = int(student_count * rate)
         if annual_yuan >= 10_000 and annual_yuan % 10_000 == 0:
             annual_price = f"{annual_yuan // 10_000}万元"
         else:
             annual_price = f"{annual_yuan}元"
-        return (
-            f"学校版按每名学生每年25元计算，{student_count}名学生约{annual_price}每年，"
-            "由学校统一采购。"
+        return templates["school_price"].format(
+            student_count=student_count,
+            annual_price=annual_price,
+            rate=int(rate) if rate.is_integer() else rate,
         )
     if _REPORT_GENERATION_RE.search(compact):
-        return (
-            "成长报告基于学生平时的过程性记录汇总生成，AI辅助整理数据和生成初稿，"
-            "经教师审核确认后形成。"
-        )
+        return templates["growth_report"]
     if _PERSONAL_INDICATOR_RE.search(compact):
-        return (
-            "现有资料只明确学校版支持自定义评价指标，个人版能否修改没有明确说明，"
-            "需要团队进一步确认。"
-        )
+        return templates["personal_indicator"]
     if (
         _INCOHERENT_ASR_RE.search(compact)
         or (
@@ -303,21 +323,13 @@ def _direct_guard_answer(message: str) -> str:
             and not _SHORT_DOMAIN_RE.search(compact)
         )
     ):
-        return "抱歉，我没听清，请再说一遍。"
+        return templates["unclear_speech"]
     if _UNVERIFIED_COMMITMENT_RE.search(compact):
-        return (
-            "现有资料不能确认这个周期，需要团队根据具体需求和接口范围评估后再答复，"
-            "不能直接承诺。"
-        )
+        return templates["unconfirmed_delivery"]
     if _MATERIAL_SEND_REQUEST_RE.search(compact):
-        return (
-            "当前语音端不能直接发送PDF，产品资料入口需要在平板应用中单独配置。"
-        )
+        return templates["material_send"]
     if _PERSONAL_APP_OPERATION_RE.search(compact):
-        return (
-            "这是个人版小程序的具体操作问题，当前语音端不能提供可靠的页面步骤，"
-            "需要由产品支持人员确认。"
-        )
+        return templates["personal_operation"]
     if _AI_LITERACY_BOUNDARY_RE.search(compact):
         return _ai_literacy_boundary_answer(compact)
     return ""
@@ -341,19 +353,22 @@ def _build_system_prompt(
     suppress_knowledge_context: bool = False,
     strategy_documents: tuple[KnowledgeDocument, ...] = (),
 ) -> str:
-    system_prompt = (
+    system_prompt = prompt_body("00_voice_system_prompt.md") or (
         '你是一个通过语音交流的知识助手。不要寒暄或重复问题，直接回答核心内容。'
         '回答必须简短、自然、口语化，最多两句话和90个汉字。'
         '不要使用Markdown、标题、项目符号、星号、下划线或表格；需要列举时直接用“第一、第二”。'
         '回答业务、产品或政策事实时不能编造。'
         '如果用户输入明显不完整或语义不通，不要复述、补全或猜测原话，直接请用户再说一遍。'
     )
+    voice_rules = prompt_body("05_voice_output_rules.md")
+    if voice_rules:
+        system_prompt += "\n\n可编辑的语音输出规则：\n" + voice_rules
     uses_ai_literacy_policy = (
         force_ai_literacy_policy
         or _needs_ai_literacy_policy(message, knowledge_result)
     )
     if uses_ai_literacy_policy:
-        system_prompt += '\n\n' + AI_LITERACY_PRODUCT_POLICY
+        system_prompt += '\n\n' + _active_ai_literacy_policy()
 
     if strategy_documents:
         strategy_context = "\n\n".join(
@@ -450,7 +465,7 @@ def llm_response(message,avatar_session:'BaseAvatar',datainfo:dict={}):
                     question=message,
                     result=knowledge_result,
                     policy_text=(
-                        AI_LITERACY_PRODUCT_POLICY
+                        _active_ai_literacy_policy()
                         if _needs_ai_literacy_policy(message, knowledge_result)
                         else ""
                     ),

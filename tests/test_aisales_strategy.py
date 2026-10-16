@@ -107,6 +107,26 @@ class AiSalesStrategyTestCase(unittest.TestCase):
             (self.worktree / "products" / "ai_sales_education").resolve(),
         )
 
+    def test_uses_project_local_strategy_when_no_external_worktree_is_configured(self):
+        with patch.dict(
+            "os.environ",
+            {"AISALES_PROMPT_WORKTREE": ""},
+            clear=False,
+        ):
+            bundle = load_ai_sales_strategy("你们公司是做什么的？")
+
+        self.assertIsNotNone(bundle)
+        self.assertEqual(
+            bundle.strategy_root,
+            (
+                Path(__file__).resolve().parents[1]
+                / "knowledge_sources"
+                / "03_digital_employee_strategy"
+            ).resolve(),
+        )
+        self.assertIn("四川乐途智学科技有限公司", bundle.context())
+        self.assertIn("可编辑提示词/04_answer_boundaries.md", bundle.context())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,6 +12,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from aisales_strategy import configured_ai_sales_product_root
+from prompt_sources import local_product_root
 from utils.logger import logger
 
 
@@ -594,6 +595,7 @@ class _QaEntry:
     question_terms: frozenset[str]
     answer_terms: frozenset[str]
     source_terms: frozenset[str]
+    variants: tuple[str, ...] = ()
 
 
 class _LocalSemanticQaIndex:
@@ -655,7 +657,8 @@ class _LocalSemanticQaIndex:
             )
             self._model.eval()
             texts = [
-                f"知识库：{entry.scope}\n问题：{entry.question}\n答案：{entry.answer}"
+                f"知识库：{entry.scope}\n问题：{entry.question}\n"
+                f"同义问法：{'；'.join(entry.variants)}\n答案：{entry.answer}"
                 for entry in self.entries
             ]
             self._entry_embeddings = self._encode(texts)
@@ -747,7 +750,10 @@ class KnowledgeBase:
 
             files = sorted(
                 path for path in root.rglob("*")
-                if path.is_file() and not path.name.startswith(".")
+                if path.is_file()
+                and not any(part.startswith(".") for part in path.relative_to(root).parts)
+                and path.suffix.lower() in {"", ".md", ".txt"}
+                and path.stem.lower() not in {"readme", "contributing", "00_qa_index"}
             )
             for path in files:
                 try:
@@ -769,7 +775,7 @@ class KnowledgeBase:
                 self.documents.append(KnowledgeDocument(scope, title, text))
                 title_terms = frozenset(_terms(title))
                 self.scope_terms.setdefault(scope, frozenset(_terms(scope)))
-                if source_scope in _PRIORITY_QA_SCOPES:
+                if scope in _PRIORITY_QA_SCOPES:
                     self.qa_entries.extend(self._parse_qa_entries(scope, title, text))
                 for chunk_text in _split_chunks(text):
                     term_counts = _terms(chunk_text)
@@ -807,10 +813,11 @@ class KnowledgeBase:
         entries: list[_QaEntry] = []
         question = ""
         answer_lines: list[str] = []
+        variants: list[str] = []
         reading_answer = False
 
         def flush() -> None:
-            nonlocal question, answer_lines, reading_answer
+            nonlocal question, answer_lines, reading_answer, variants
             answer = "\n".join(answer_lines).strip()
             if question and answer:
                 entries.append(
@@ -819,13 +826,15 @@ class KnowledgeBase:
                         title=title,
                         question=question,
                         answer=answer,
-                        question_terms=frozenset(_terms(question, query=True)),
+                        question_terms=frozenset(_terms(question + " " + " ".join(variants), query=True)),
                         answer_terms=frozenset(_terms(answer, query=True)),
                         source_terms=frozenset(_terms(scope, query=True)),
+                        variants=tuple(variants),
                     )
                 )
             question = ""
             answer_lines = []
+            variants = []
             reading_answer = False
 
         for raw_line in text.splitlines():
@@ -841,6 +850,17 @@ class KnowledgeBase:
                 first_line = answer_match.group(1).strip()
                 if first_line:
                     answer_lines.append(first_line)
+                continue
+
+            variant_match = re.match(
+                r"^\s*(?:\*\*)?(?:同义问法|变体|variants)[：:](?:\*\*)?\s*(.+)$",
+                raw_line, re.IGNORECASE,
+            )
+            if variant_match and question:
+                variants.extend(
+                    item.strip() for item in re.split(r"[;；|]", variant_match.group(1))
+                    if item.strip()
+                )
                 continue
 
             if reading_answer:
@@ -1401,7 +1421,15 @@ def _configured_knowledge_roots() -> tuple[Path, ...]:
     roots: list[Path] = []
     root_value = os.getenv("KNOWLEDGE_BASE_DIR", "").strip()
     if root_value:
-        roots.append(Path(root_value).expanduser().resolve())
+        # An explicit directory is the authoritative knowledge source. Do not
+        # merge the legacy bundled or AiSales product directories into it:
+        # merging would reintroduce stale documents and internal SOP material.
+        root = Path(root_value).expanduser()
+        if not root.is_absolute():
+            root = Path(__file__).resolve().parent / root
+        return (root.resolve(),)
+    if local_product_root().is_dir():
+        return (local_product_root().resolve(),)
     if (
         _BUNDLED_KNOWLEDGE_ROOT.is_dir()
         and any(path.is_file() for path in _BUNDLED_KNOWLEDGE_ROOT.rglob("*"))

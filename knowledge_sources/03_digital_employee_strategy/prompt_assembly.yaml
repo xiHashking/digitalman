@@ -1,0 +1,158 @@
+name: "ai_sales_education"
+description: AI教育产品销售，主要负责公司的AI教育产品推广。
+
+target_org_id: "ai_sales_education"
+use_json_mode: true
+hide_mode_fields: true
+enable_skip_response: true
+ace_input_mode: "state"
+
+
+available_tools:
+  - load_status_book_tool
+  - schedule_action
+  - manage_scheduled_action
+  - load_skills_tool
+  - transfer_to_human
+  - product_grep_raw_tool
+  - product_get_raw_tool
+  - knowledge_qa_tool
+
+status_book:
+  fragments:
+    - name: 教育产品销售场景
+      description: 记录 AI 教育产品销售客户跟进的状态本，包含 company_name、customer_role 和 usage_type，用于理解客户身份角色、公司/学校名称，以及当前是个人使用体验还是学校整体使用，在聊到相关内容时你务必调用该分片。
+      path: status_book/status_book.yaml
+
+
+pre_process_agent_prompt:
+  cached: []
+  before_history: []
+  before_last_user: []
+  after_last_user: []
+  before_last_tool_result: []
+  after_last_tool_result: []
+
+main_agent_prompt:
+  cached:
+    - label: 主提示词
+      path: main_prompt.md
+      required: true
+  before_history:
+    - label: 内置系统记忆：用户资料、当前时间等
+      var: system.system_reminder
+      required: true
+    - label: 技能加载结果
+      var: system.skill_result
+      required: true
+  before_last_user:
+    - label: 前置 agent 执行结果
+      var: system.pre_agent_result
+      required: false
+  after_last_user: []
+  before_last_tool_result: []
+  after_last_tool_result: []
+
+system_skills:
+  - name: basic-product-information-introduction
+    description: 用于处理AI学生综合素质评价系统的基础产品咨询，统一产品定位、核心价值、适用场景和定制化需求的介绍口径。
+    path: skills/basic_product_information_introduction.md
+    required: true
+  - name: product-qa-rule
+    description: 用于处理AI学生综合素质评价系统的常见问题，统一标准答法，避免销售临场乱说。
+    path: skills/product_qa_rule.md
+    required: true
+  - name: send-material
+    description: 用于处理用户请求产品资料、解决方案或说明文档的强制流程。
+    path: skills/pdf_workflow.md
+    required: true
+  - name: transfer-to-human-rule
+    description: 用于规范AI学生综合素质评价系统销售过程中的转人工场景、报价拦截场景和定制化需求收集规则。
+    path: skills/transfer_to_human_rule.md
+    required: true
+  - name: case-introduction
+    description: 用于处理客户索要案例、成功经验、落地例子时的统一口径，覆盖AI素养评价方向和教育场景定制化方向。
+    path: skills/case_introduction.md
+    required: true
+
+post_process_agent_prompt:
+  cached: []
+  before_history: []
+  before_last_user: []
+  after_last_user: []
+  before_last_tool_result: []
+  after_last_tool_result: []
+
+followup_agent_prompt:
+  cached:
+    - label: AI教育销售主提示词
+      path: main_prompt.md
+      required: true
+  before_history:
+    - label: AI教育销售跟进内容提示词
+      path: followup/followup_prompt.md
+      required: true
+    - label: 内置系统记忆：用户画像、当前时间等
+      var: system.system_reminder
+      required: true
+  before_last_user: []
+  after_last_user: []
+  before_last_tool_result: []
+  after_last_tool_result: []
+
+followup_agent_llm_config:
+  temperature: 0.3
+
+followup_rhythm_agent_prompt:
+  cached:
+    - label: AI教育销售主提示词
+      path: main_prompt.md
+      required: true
+  before_history:
+    - label: AI教育销售跟进节奏提示词
+      path: followup/rhythm_prompt.md
+      required: true
+    - label: 内置系统记忆：用户画像、当前时间等
+      var: system.system_reminder
+      required: true
+  before_last_user: []
+  after_last_user: []
+  before_last_tool_result: []
+  after_last_tool_result: []
+
+compliance_agent_prompt:
+  cached: []
+  before_history: []
+  before_last_user: []
+  after_last_user: []
+  before_last_tool_result: []
+  after_last_tool_result: []
+
+# ==================== 拦截 / CRM Agent 补充配置 ====================
+# 平台通用安全底座由代码内置；这里只追加当前策略的 AI教育销售规则。
+
+interception_decision_agent_prompt:
+  cached:
+    - name: ai_education_strategy_interception_rules
+      label: "AI教育销售拦截补充规则"
+      path: crm/interception_extra.md
+
+crm_state_cleanup_agent_prompt:
+  cached:
+    - name: ai_education_strategy_crm_cleanup_rules
+      label: "AI教育销售 CRM 清洗补充规则"
+      path: crm/crm_state_cleanup_extra.md
+
+crm_status_book_extraction_agent_prompt:
+  cached:
+    - name: ai_education_strategy_crm_extraction_rules
+      label: "AI教育销售 CRM 提取补充规则"
+      path: crm/crm_status_book_extraction_extra.md
+
+crm_state_cleanup_agent_llm_config:
+  temperature: 0.1
+  max_tokens: 12000
+
+crm_status_book_extraction_agent_llm_config:
+  temperature: 0.1
+  max_tokens: 12000
