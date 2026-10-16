@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -6,11 +7,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_live2d/flutter_live2d.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import 'livetalking_controller.dart';
 
 enum _AvatarMode {
   real('真人商务形象', '使用服务器返回的视频数字人'),
+  vrm3d('3D 动漫原型', 'VRM · WebView 渲染'),
   haru(
     'Haru 接待员',
     '商务接待 · 本地 Live2D',
@@ -108,6 +111,65 @@ class _TabletConversationPageState extends State<TabletConversationPage>
     with WidgetsBindingObserver {
   late final LiveTalkingController _controller;
   late final Live2DViewController _haruController;
+  late final WebViewController _vrmController;
+  HttpServer? _vrmServer;
+
+  Future<void> _startVrmServer() async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    if (!mounted) {
+      await server.close(force: true);
+      return;
+    }
+    _vrmServer = server;
+    server.listen((request) async {
+      final name = request.uri.path == '/'
+          ? 'index.html'
+          : request.uri.path.substring(1);
+      if (!{
+        'index.html',
+        'prototype.js',
+        'sample.vrm',
+        'AvatarSample_B.vrm',
+        'AvatarSample_B_teacher-experiment.vrm',
+        'education-teacher-v1.vrm',
+        'test.wav',
+        'classroom-daylight.png',
+        'backgrounds/classroom-daylight.png',
+      }.contains(name)) {
+        request.response.statusCode = 404;
+      } else {
+        try {
+          final path = name == 'backgrounds/classroom-daylight.png'
+              ? 'assets/$name'
+              : name == 'classroom-daylight.png'
+              ? 'assets/backgrounds/$name'
+              : 'assets/three_d/$name';
+          final data = await rootBundle.load(path);
+          request.response.headers.set(
+            'Content-Type',
+            name.endsWith('.html')
+                ? 'text/html; charset=utf-8'
+                : name.endsWith('.js')
+                ? 'application/javascript'
+                : name.endsWith('.png')
+                ? 'image/png'
+                : 'application/octet-stream',
+          );
+          request.response.add(
+            data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+          );
+        } catch (error) {
+          request.response.statusCode = 500;
+          debugPrint('[3D] asset error: $error');
+        }
+      }
+      await request.response.close();
+    });
+    await _vrmController.loadRequest(
+      Uri.parse('http://127.0.0.1:${server.port}/'),
+    );
+  }
+
   bool _initializing = true;
   bool _chromeVisible = false;
   _AvatarMode _avatarMode = _AvatarMode.real;
@@ -124,6 +186,16 @@ class _TabletConversationPageState extends State<TabletConversationPage>
     WidgetsBinding.instance.addObserver(this);
     _controller = LiveTalkingController();
     _haruController = Live2DViewController();
+    _vrmController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onWebResourceError: (error) =>
+              debugPrint('[3D] ${error.description}'),
+        ),
+      );
+    unawaited(_startVrmServer());
     unawaited(_initialize());
   }
 
@@ -143,6 +215,7 @@ class _TabletConversationPageState extends State<TabletConversationPage>
 
   @override
   void dispose() {
+    unawaited(_vrmServer?.close(force: true));
     WidgetsBinding.instance.removeObserver(this);
     _haruMouthTimer?.cancel();
     _haruController.dispose();
@@ -392,7 +465,9 @@ class _TabletConversationPageState extends State<TabletConversationPage>
             fit: StackFit.expand,
             children: <Widget>[
               const ColoredBox(color: Color(0xFF090B0F)),
-              if (_avatarMode.isLive2D) ...[
+              if (_avatarMode == _AvatarMode.vrm3d)
+                WebViewWidget(controller: _vrmController)
+              else if (_avatarMode.isLive2D) ...[
                 Image.asset(
                   'assets/backgrounds/classroom-daylight.png',
                   fit: BoxFit.cover,
@@ -437,7 +512,8 @@ class _TabletConversationPageState extends State<TabletConversationPage>
               // Keep the start/error panel below the top controls. If this
               // is the last Stack child it intercepts the avatar selector,
               // making Haru impossible to select before connecting.
-              if (!_avatarMode.isLive2D &&
+              if (_avatarMode != _AvatarMode.vrm3d &&
+                  !_avatarMode.isLive2D &&
                   (!_controller.started ||
                       _controller.state == ConversationState.error))
                 _buildStartLayer(),
@@ -464,7 +540,9 @@ class _TabletConversationPageState extends State<TabletConversationPage>
             ),
             const Spacer(),
             _IconControl(
-              icon: _avatarMode.isLive2D
+              icon: _avatarMode == _AvatarMode.vrm3d
+                  ? Icons.view_in_ar_rounded
+                  : _avatarMode.isLive2D
                   ? Icons.face_retouching_natural_rounded
                   : Icons.person_outline_rounded,
               tooltip: '选择数字人形象',
