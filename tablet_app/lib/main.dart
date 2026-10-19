@@ -390,63 +390,14 @@ class _TabletConversationPageState extends State<TabletConversationPage>
   }
 
   Future<void> _showSettings({bool reconnectAfterSave = true}) async {
-    final textController = TextEditingController(
-      text: _controller.serverAddress,
-    );
-    String? validationError;
     final shouldReconnect = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF11161D),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              title: const Text('服务器设置'),
-              content: SizedBox(
-                width: 460,
-                child: TextField(
-                  controller: textController,
-                  autofocus: true,
-                  keyboardType: TextInputType.url,
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    labelText: '服务器地址',
-                    hintText: '例如：192.168.1.100:8010',
-                    helperText: '填写运行 LiveTalking 服务的电脑局域网地址',
-                    errorText: validationError,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    try {
-                      await _controller.saveServerAddress(textController.text);
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(true);
-                      }
-                    } on FormatException catch (error) {
-                      setDialogState(() => validationError = error.message);
-                    }
-                  },
-                  child: const Text('保存'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _ServerSettingsDialog(
+        initialAddress: _controller.serverAddress,
+        onSave: _controller.saveServerAddress,
+      ),
     );
-    textController.dispose();
     if (!_chromeVisible) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
@@ -697,6 +648,101 @@ class _TabletConversationPageState extends State<TabletConversationPage>
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ServerSettingsDialog extends StatefulWidget {
+  const _ServerSettingsDialog({
+    required this.initialAddress,
+    required this.onSave,
+  });
+
+  final String initialAddress;
+  final Future<void> Function(String value) onSave;
+
+  @override
+  State<_ServerSettingsDialog> createState() => _ServerSettingsDialogState();
+}
+
+class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
+  late final TextEditingController _textController;
+  String? _validationError;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.initialAddress);
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _validationError = null;
+    });
+    try {
+      await widget.onSave(_textController.text);
+      if (mounted) Navigator.of(context).pop(true);
+    } on FormatException catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _validationError = error.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+      rethrow;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF11161D),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      title: const Text('服务器设置'),
+      content: SizedBox(
+        width: 460,
+        child: TextField(
+          controller: _textController,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          enabled: !_saving,
+          decoration: InputDecoration(
+            labelText: '服务器地址',
+            hintText: '例如：192.168.1.100:8010',
+            helperText: '填写运行 LiveTalking 服务的电脑局域网地址',
+            errorText: _validationError,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('保存'),
+        ),
+      ],
     );
   }
 }
